@@ -7,7 +7,7 @@
 #   pull request ke main → cek build saja
 #
 # Butuh (Settings → Secrets and variables → Actions):
-#   - Variable BACKEND_REPOSITORY : pemilik/nama-repo-backend, mis. edopranata/penjualan-backend
+#   - Variable BACKEND_REPOSITORY : pemilik/nama-repo-backend, yaitu edopranata/kanaka-backend
 #   - Secret   BACKEND_DEPLOY_KEY : private key SSH yang public key-nya didaftarkan sebagai
 #                                   Deploy key (Allow write access) di repo backend
 name: Build ke Backend

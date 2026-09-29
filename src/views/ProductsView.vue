@@ -71,6 +71,9 @@ function openForm(product = null) {
   form.value = { ...emptyForm(), ...product, category_id: product.category_id || '', cost_price: Math.round(product.cost_price || 0), units }
 }
 
+/** Stok awal boleh diisi untuk produk baru, atau produk lama yang belum pernah punya mutasi stok (mis. hasil import). */
+const canSetInitialStock = (form) => !form.id || (form.has_movements === false && !form.consignor)
+
 // ---- Satuan & harga jual ----
 const baseUnit = (form) => form.units.find((unit) => unit.conversion === 1)
 const extraUnits = (form) => form.units.filter((unit) => unit.conversion !== 1)
@@ -109,7 +112,7 @@ async function save() {
       .filter((unit) => unit.id || unit.sell_price > 0)
       .map((unit) => ({ ...unit, name: unit.conversion === 1 ? form.value.unit : unit.name, barcode: unit.conversion === 1 ? null : unit.barcode || null })),
   }
-  if (payload.id) delete payload.initial_stock
+  if (payload.id && !canSetInitialStock(form.value)) delete payload.initial_stock
   try {
     if (payload.id) {
       await http.put(`/products/${payload.id}`, payload)
@@ -403,9 +406,11 @@ onMounted(() => {
           <label class="label">Stok minimum (peringatan)</label>
           <input v-model.number="form.min_stock" type="number" min="0" class="input" />
         </div>
-        <div v-if="!form.id">
-          <label class="label">Stok awal</label>
-          <input v-model.number="form.initial_stock" type="number" min="0" class="input" />
+        <div v-if="canSetInitialStock(form)">
+          <label class="label">Stok awal ({{ form.unit || 'satuan dasar' }})</label>
+          <input v-model.number="form.initial_stock" type="number" min="0" class="input" :class="{ 'input-error': errors.initial_stock }" @focus="$event.target.select()" />
+          <p v-if="errors.initial_stock" class="error-text">{{ errors.initial_stock }}</p>
+          <p v-else-if="form.id" class="mt-1 text-xs text-slate-500">Belum ada transaksi — stok awal bisa diisi sekali, dicatat di kartu stok dengan HPP di atas.</p>
         </div>
         <div v-else>
           <label class="label">Stok saat ini</label>

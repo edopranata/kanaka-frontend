@@ -1,0 +1,73 @@
+# Build frontend lalu commit hasilnya ke repo backend (public/ + resources/spa/).
+# Push dari workflow ini memicu workflow "Tes & Deploy Produksi" di repo backend.
+#
+# Butuh (Settings → Secrets and variables → Actions):
+#   - Variable BACKEND_REPOSITORY : pemilik/nama-repo-backend, mis. edopranata/penjualan-backend
+#   - Secret   BACKEND_DEPLOY_KEY : private key SSH yang public key-nya didaftarkan sebagai
+#                                   Deploy key (Allow write access) di repo backend
+name: Build ke Backend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-to-backend
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          path: frontend
+
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.BACKEND_REPOSITORY }}
+          ref: main
+          path: backend
+          ssh-key: ${{ secrets.BACKEND_DEPLOY_KEY }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependency
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build (npm run build:laravel)
+        working-directory: frontend
+        env:
+          LARAVEL_PATH: ../backend
+        run: npm run build:laravel
+
+      - name: Commit & push ke backend
+        working-directory: backend
+        env:
+          SHA: ${{ github.sha }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f public resources/spa
+          if git diff --cached --quiet; then
+            echo "Hasil build tidak berubah, tidak ada yang di-commit."
+            exit 0
+          fi
+          git commit -m "build: frontend ${SHA::7}" -m "${MESSAGE:-Build manual}" -m "Sumber: ${{ github.server_url }}/${{ github.repository }}/commit/${SHA}"
+          # Bila repo backend baru saja berubah, ambil dulu lalu coba push lagi.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          echo "Gagal push ke repo backend." >&2
+          exit 1

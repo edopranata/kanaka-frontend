@@ -74,12 +74,39 @@ produk yang sudah ada dikenali dari barcode-nya. Bila `JENIS` kosong/NA, kategor
 
 ```bash
 cd backend
-php artisan products:import "database/DATABASE 50.600+ DATA ITEM WARUNG IPOS4.xlsx"   # ±10 detik untuk 50.601 item
-php artisan products:import file.xlsx --update   # perbarui nama/kategori/harga produk yang kodenya sudah ada
+php artisan products:import "database/DATABASE 50.600+ DATA ITEM WARUNG IPOS4.xlsx"   # ±15 detik untuk 50.601 item
+php artisan products:import file.xlsx --update     # perbarui nama/kategori/harga produk yang kodenya sudah ada
+php artisan products:import file.csv --inactive    # produk BARU dibuat nonaktif (tidak tampil di kasir)
 ```
+
+- **Excel vs CSV**: Excel dimuat utuh ke memori (±2,5 GB untuk 50 ribu barang), sedangkan **CSV dibaca baris per baris
+  (±150 MB)**. Untuk server/hosting, ubah dulu ke CSV dengan `php artisan products:to-csv file.xlsx [hasil.csv]`
+  (barcode berawalan 0 dan barcode panjang tetap utuh — jangan "Save As CSV" dari Excel, barcode bisa jadi `8,99E+12`).
+  CSV boleh berpemisah `,` atau `;`.
+- **`--inactive`** (atau centang *Jadikan produk baru nonaktif* di menu Import): cocok untuk master awal. Produk tetap
+  punya SKU & kategori, bisa dibeli/di-opname/jadi bahan paket, lalu diaktifkan satu per satu setelah harga & stoknya siap.
+  Status produk yang sudah ada tidak diubah.
 
 File kecil juga bisa diupload dari menu **Produk → Import Excel**. Produk yang kodenya sudah ada dilewati (kecuali mode
 perbarui), barcode yang bentrok dengan produk lain dicatat di hasil import, dan stok produk lama tidak pernah diubah oleh import.
+
+### Import master awal di server (Hostinger)
+
+File Excel master tidak ikut repo. Dari komputer lokal (folder `backend`):
+
+```bash
+php artisan products:to-csv "database/DATABASE 50.600+ DATA ITEM WARUNG IPOS4.xlsx" storage/app/private/import/master-produk.csv
+scp -P 65002 storage/app/private/import/master-produk.csv u123456789@IP_SERVER:~/master-produk.csv
+```
+
+Lalu di server (SSH), dari folder aplikasi:
+
+```bash
+php artisan products:import ~/master-produk.csv --inactive
+rm ~/master-produk.csv
+```
+
+Menjalankan ulang aman: produk yang sudah ada (barcode / kode sama) dilewati.
 
 ## Paket / menu olahan
 

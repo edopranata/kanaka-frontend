@@ -20,7 +20,8 @@ const meta = useMetaStore()
 const route = useRoute()
 const canManage = auth.can('products.manage')
 
-const filters = reactive({ search: '', category_id: '', low_stock: route.query.low_stock === '1' ? 1 : 0, sellable: '' })
+// Status default: hanya produk aktif (tampil di kasir). '' = semua status.
+const filters = reactive({ search: '', category_id: '', low_stock: route.query.low_stock === '1' ? 1 : 0, sellable: '', active: route.query.active ?? '1' })
 const products = ref([])
 const pagination = ref(null)
 const categories = ref([])
@@ -212,8 +213,13 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div class="card mb-4 grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div class="card mb-4 grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-6">
       <input v-model="filters.search" type="search" class="input sm:col-span-2" placeholder="Cari nama / SKU / scan barcode…" @keydown.enter="load()" @search="load()" />
+      <select v-model="filters.active" class="input" @change="load()">
+        <option value="1">Aktif</option>
+        <option value="0">Nonaktif</option>
+        <option value="">Semua status</option>
+      </select>
       <select v-model="filters.sellable" class="input" @change="load()">
         <option value="">Semua produk</option>
         <option value="1">Sudah ada harga jual</option>
@@ -290,7 +296,14 @@ onMounted(() => {
           </tbody>
         </table>
       </div>
-      <EmptyState v-if="!loading && !products.length" icon="cube" title="Belum ada produk" />
+      <EmptyState
+        v-if="!loading && !products.length"
+        icon="cube"
+        :title="filters.active === '1' ? 'Tidak ada produk aktif' : filters.active === '0' ? 'Tidak ada produk nonaktif' : 'Belum ada produk'"
+        :text="filters.active === '1' ? 'Produk nonaktif (mis. hasil import master) tidak ditampilkan. Aktifkan produk setelah harga jualnya diisi.' : ''"
+      >
+        <button v-if="filters.active !== ''" class="btn-secondary" @click="filters.active = ''; load()">Tampilkan semua status</button>
+      </EmptyState>
       <PaginationBar :meta="pagination" @page="load" />
     </div>
 

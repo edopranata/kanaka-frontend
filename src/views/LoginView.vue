@@ -29,7 +29,8 @@ async function submit() {
   try {
     await auth.login(form.username, form.password)
     const fallback = auth.can('dashboard') ? '/' : '/akun'
-    router.replace(route.query.redirect || (auth.user.role === 'kasir' ? '/kasir' : fallback))
+    // Halaman awal diatur per role (Dashboard / Kasir).
+    router.replace(route.query.redirect || (auth.user.home === 'pos' && auth.can('pos') ? '/kasir' : fallback))
   } catch (e) {
     error.value = errorMessage(e)
   } finally {

@@ -52,6 +52,7 @@ const groups = [
     label: 'Administrasi',
     items: [
       { name: 'users', label: 'Pengguna', icon: 'user', match: ['users'] },
+      { name: 'roles', label: 'Role & Hak Akses', icon: 'shield', match: ['roles'] },
       { name: 'logs', label: 'Log Aktivitas', icon: 'clipboard', match: ['logs'] },
       { name: 'settings', label: 'Pengaturan Aplikasi', icon: 'cog', match: ['settings'] },
     ],

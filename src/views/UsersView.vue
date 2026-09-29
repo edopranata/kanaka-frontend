@@ -2,7 +2,6 @@
 import { onMounted, ref } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
-import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
@@ -10,7 +9,6 @@ import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const auth = useAuthStore()
-const meta = useMetaStore()
 const toast = useToastStore()
 
 const users = ref([])
@@ -18,23 +16,20 @@ const form = ref(null)
 const errors = ref({})
 const saving = ref(false)
 
-const roleInfo = {
-  owner: 'Akses penuh termasuk pengaturan toko & batal closing.',
-  admin: 'Kelola semua data, laporan, void transaksi, dan pengguna (kecuali pemilik).',
-  gudang: 'Produk, supplier, pembelian, penyesuaian/opname stok, laporan stok.',
-  kasir: 'Kasir (POS), pelanggan, riwayat transaksi sendiri, dan closing manual.',
-}
-
-const roles = () => meta.roles.filter((role) => auth.user.role === 'owner' || role.value !== 'owner')
+const roles = ref([])
+// Role yang boleh diberikan oleh pengguna yang sedang login (akses tidak melebihi miliknya).
+const assignable = () => roles.value.filter((role) => role.manageable)
 
 async function load() {
-  const { data } = await http.get('/users')
-  users.value = data.data
+  const [usersResponse, rolesResponse] = await Promise.all([http.get('/users'), http.get('/roles')])
+  users.value = usersResponse.data.data
+  roles.value = rolesResponse.data.data
 }
 
 function openForm(user = null) {
   errors.value = {}
-  form.value = user ? { ...user, password: '' } : { id: null, name: '', username: '', email: '', role: 'kasir', is_active: true, password: '' }
+  const kasir = assignable().find((role) => role.slug === 'kasir') || assignable().at(-1)
+  form.value = user ? { ...user, password: '' } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true, password: '' }
 }
 
 async function save() {
@@ -74,23 +69,27 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
 
 <template>
   <div class="stagger">
-    <PageHeader title="Pengguna" subtitle="Akun dan level akses">
+    <PageHeader title="Pengguna" subtitle="Akun dan role (jabatan) masing-masing">
       <template #actions>
+        <RouterLink v-if="auth.can('roles.manage')" :to="{ name: 'roles' }" class="btn-secondary"><AppIcon name="shield" :size="16" /> Role & Hak Akses</RouterLink>
         <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Pengguna Baru</button>
       </template>
     </PageHeader>
 
-    <div class="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <div v-for="role in meta.roles" :key="role.value" class="card p-4">
-        <p class="font-semibold text-slate-900">{{ role.label }}</p>
-        <p class="mt-1 text-xs text-slate-500">{{ roleInfo[role.value] }}</p>
+    <div class="mb-4 grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">
+      <div v-for="role in roles" :key="role.id" class="card p-4">
+        <p class="flex items-center justify-between gap-2 font-semibold text-slate-900">
+          <span class="truncate">{{ role.name }}</span>
+          <span class="shrink-0 text-xs font-normal text-slate-500">{{ role.users_count }} pengguna</span>
+        </p>
+        <p class="mt-1 text-xs text-slate-500">{{ role.description || '—' }}</p>
       </div>
     </div>
 
     <div class="card overflow-hidden">
       <div class="table-wrap">
         <table v-stack class="table">
-          <thead><tr><th>Nama</th><th>Nama Pengguna</th><th>Level</th><th>Email</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Nama</th><th>Nama Pengguna</th><th>Role</th><th>Email</th><th>Status</th><th></th></tr></thead>
           <tbody>
             <tr v-for="user in users" :key="user.id">
               <td class="font-medium">{{ user.name }} <span v-if="user.id === auth.user?.id" class="text-xs text-slate-400">(Anda)</span></td>
@@ -99,7 +98,7 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
               <td>{{ user.email || '-' }}</td>
               <td><StatusBadge :status="user.is_active ? 'aktif' : 'nonaktif'" /></td>
               <td class="text-right">
-                <template v-if="auth.user.role === 'owner' || user.role !== 'owner'">
+                <template v-if="user.can_manage">
                   <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(user)"><AppIcon name="pencil" :size="16" /></button>
                   <button v-if="user.id !== auth.user?.id" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(user)"><AppIcon name="trash" :size="16" /></button>
                 </template>
@@ -128,11 +127,12 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
           <p v-if="errors.email" class="error-text">{{ errors.email }}</p>
         </div>
         <div>
-          <label class="label">Level</label>
-          <select v-model="form.role" class="input" :disabled="form.id === auth.user?.id">
-            <option v-for="role in roles()" :key="role.value" :value="role.value">{{ role.label }}</option>
+          <label class="label">Role</label>
+          <select v-model="form.role_id" class="input" :class="{ 'input-error': errors.role_id }" :disabled="form.id === auth.user?.id" required>
+            <option v-if="form.id === auth.user?.id" :value="form.role_id">{{ form.role_label }}</option>
+            <option v-for="role in assignable()" :key="role.id" :value="role.id">{{ role.name }}</option>
           </select>
-          <p v-if="errors.role" class="error-text">{{ errors.role }}</p>
+          <p v-if="errors.role_id" class="error-text">{{ errors.role_id }}</p>
         </div>
         <div>
           <label class="label">Kata sandi {{ form.id ? '(kosongkan jika tetap)' : '' }}</label>

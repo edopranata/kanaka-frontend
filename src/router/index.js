@@ -51,6 +51,7 @@ const routes = [
       { path: 'closing/:id', name: 'closing', component: view('ClosingDetailView'), meta: { title: 'Detail Closing', permission: 'closings.view' } },
       { path: 'laporan', name: 'reports', component: view('ReportsView'), meta: { title: 'Laporan', permission: ['reports.sales', 'reports.profit', 'reports.stock'] } },
 
+      { path: 'role', name: 'roles', component: view('RolesView'), meta: { title: 'Role & Hak Akses', permission: 'roles.manage' } },
       { path: 'pengguna', name: 'users', component: view('UsersView'), meta: { title: 'Pengguna', permission: 'users.manage' } },
       { path: 'log-aktivitas', name: 'logs', component: view('ActivityLogsView'), meta: { title: 'Log Aktivitas', permission: 'logs.view' } },
       { path: 'pengaturan', name: 'settings', component: view('SettingsView'), meta: { title: 'Pengaturan Aplikasi', permission: 'settings.manage' } },

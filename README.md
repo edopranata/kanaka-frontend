@@ -183,17 +183,37 @@ Saat fitur ini dipasang (`php artisan migrate`, perintah `cash:init`), saldo lac
 Pemilik dan transaksi yang belum di-closing dibukukan ke akun masing-masing. Saldo awal rekening bank diisi lewat
 *Penyesuaian saldo*.
 
-## Level user
+## Role & hak akses (RBAC)
 
-| Level | Hak akses |
+Konsep: **Pengguna → 1 Role → banyak hak akses (permission)**. Role dibuat di menu **Administrasi → Role & Hak Akses**
+sesuai jabatan (mis. Supervisor Kasir, Keuangan, Kepala Gudang), lalu diberikan ke pengguna di menu **Pengguna**.
+
+Role bawaan (hasil migrasi dari level lama, hak aksesnya sama persis):
+
+| Role | Hak akses awal |
 | --- | --- |
-| **Pemilik** (`owner`) | Semua fitur, termasuk pengaturan toko dan **batal closing**. |
-| **Admin / Manajer** (`admin`) | Semua data, laporan (termasuk laba), diskon & promo, kas & rekening semua pengguna, void transaksi, closing, tagihan & pembayaran piutang, dan kelola pengguna (kecuali akun pemilik). |
-| **Staf Gudang** (`gudang`) | Produk, supplier, pembelian, barang titipan, penyesuaian/opname, kartu stok, laporan stok & pembelian. |
-| **Kasir** (`kasir`) | POS, **bon (penjualan kredit)**, pelanggan, riwayat transaksi **miliknya sendiri**, kas fisik sendiri (setor bank / serah terima), dan closing manual. Tidak melihat HPP/laba maupun mengelola tagihan. |
+| **Pemilik** 🔒 | Role sistem: **selalu semua hak akses**, termasuk hak akses baru di masa depan. Tidak bisa diubah/dihapus. |
+| **Admin / Manajer** | Semua data, laporan (termasuk laba), diskon & promo, kas & rekening semua pengguna, void transaksi, closing, tagihan & piutang, kelola pengguna. Tanpa: pengaturan aplikasi, batal closing, kelola role. |
+| **Staf Gudang** | Produk, supplier, pembelian, barang titipan, penyesuaian/opname, kartu stok, laporan stok & pembelian. |
+| **Kasir** | POS, bon, pelanggan, riwayat transaksi **miliknya sendiri**, kas fisik sendiri, closing manual. Halaman awal: Kasir. |
 
-Hak akses diatur di satu tempat: `backend/app/Enums/UserRole.php` (method `permissions()`).
-Frontend menyesuaikan menu otomatis dari daftar permission yang dikirim API.
+Role bawaan selain Pemilik bisa diubah seperti role lain. Setiap role punya **halaman awal** setelah login
+(Dashboard atau Kasir). Form role mengelompokkan hak akses per modul, bisa **menyalin** dari role lain, dan otomatis
+mencentang hak akses yang dibutuhkan (mis. *Kasir (POS)* → *Lihat produk*).
+
+Aturan keamanan:
+
+- Mengelola role butuh hak akses **Kelola role & hak akses** (`roles.manage`), awalnya hanya Pemilik.
+- Pengguna dengan *Kelola pengguna* hanya bisa memberi / mengubah akun dengan role yang hak aksesnya **tidak melebihi
+  miliknya**; role Pemilik hanya oleh Pemilik. Pengelola role non-pemilik tidak bisa memberi hak akses yang tidak ia
+  miliki dan tidak bisa mengubah role miliknya sendiri.
+- Tidak bisa mengubah role / menonaktifkan akun sendiri; selalu tersisa minimal satu Pemilik aktif; role yang masih
+  dipakai tidak bisa dihapus.
+- Perubahan hak akses **langsung berlaku** di server (tanpa login ulang); semua perubahan role tercatat di Log Aktivitas.
+
+Untuk developer: daftar hak akses (kode, label, grup, ketergantungan) ada di `backend/app/Enums/Permission.php`
+(`catalog()`); route memakai middleware `permission:a,b`, frontend memakai `auth.can('a')`. Menambah fitur baru =
+tambah konstanta + entri katalog, lalu cek di route/frontend; Pemilik otomatis mendapatkannya.
 
 ## Aturan closing harian
 

@@ -1,19 +1,19 @@
-# Aplikasi Penjualan: Kasir, Inventory, Closing & Laporan
+# Kanaka · Aplikasi Penjualan: Kasir, Inventory, Closing & Laporan
 
 Aplikasi terdiri dari **2 repository** (README ini sama di keduanya):
 
 | Repo | Isi |
 | --- | --- |
-| **backend** | Laravel 13 API (Sanctum token, PhpSpreadsheet untuk import/export Excel, scheduler untuk closing otomatis & tagihan bulanan). Juga menyajikan hasil build frontend di produksi. |
-| **frontend** | Vue 3 SPA + PWA (Pinia, Vue Router, Tailwind 4). Bisa di-install di tablet kasir, HP, dan laptop. |
+| **backend** · [edopranata/kanaka-backend](https://github.com/edopranata/kanaka-backend) | Laravel 13 API (Sanctum token, PhpSpreadsheet untuk import/export Excel, scheduler untuk closing otomatis & tagihan bulanan). Juga menyajikan hasil build frontend di produksi. |
+| **frontend** · [edopranata/kanaka-frontend](https://github.com/edopranata/kanaka-frontend) | Vue 3 SPA + PWA (Pinia, Vue Router, Tailwind 4). Bisa di-install di tablet kasir, HP, dan laptop. |
 
 Untuk development, clone keduanya **berdampingan** dalam satu folder, karena proxy dev dan `npm run build:laravel`
 mengasumsikan susunan ini:
 
 ```
-penjualan/
-├── backend/    ← repo backend
-└── frontend/   ← repo frontend
+kanaka/
+├── backend/    ← kanaka-backend
+└── frontend/   ← kanaka-frontend
 ```
 
 ## Fitur
@@ -188,9 +188,9 @@ Frontend menyesuaikan menu otomatis dari daftar permission yang dikirim API.
 Kebutuhan: PHP 8.3+, Composer, Node 20.19+ / 22+.
 
 ```bash
-mkdir penjualan && cd penjualan
-git clone git@github.com:<akun>/<repo-backend>.git backend
-git clone git@github.com:<akun>/<repo-frontend>.git frontend
+mkdir kanaka && cd kanaka
+git clone https://github.com/edopranata/kanaka-backend.git backend
+git clone https://github.com/edopranata/kanaka-frontend.git frontend
 
 # Backend (API): http://localhost:8020
 cd backend

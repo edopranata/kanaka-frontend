@@ -219,7 +219,8 @@ Test backend: `cd backend && php artisan test`
 ## Produksi
 
 > **Hostinger (Cloud Hosting / hPanel) dengan 2 repo private + deploy otomatis lewat GitHub Actions:**
-> ikuti **`DEPLOY.md` di repo backend**. Push ke `main` di repo frontend/backend langsung dites & terbit.
+> ikuti **`DEPLOY.md` di repo backend**. Branch `main` = produksi (push → dites & terbit otomatis),
+> branch `dev` = pengembangan (push → dites / cek build saja, tanpa deploy). Rilis dengan merge `dev` → `main`.
 
 1. **Backend**: deploy Laravel seperti biasa (MySQL: ubah `DB_*` di `.env`, pastikan `APP_TIMEZONE=Asia/Jakarta`),
    jalankan `php artisan migrate --force --seed`, lalu segera ganti kata sandi `owner` di menu Akun Saya.

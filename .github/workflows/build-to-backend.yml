@@ -1,6 +1,11 @@
 # Build frontend lalu commit hasilnya ke repo backend (public/ + resources/spa/).
 # Push dari workflow ini memicu workflow "Tes & Deploy Produksi" di repo backend.
 #
+# Branch:
+#   main → build + commit ke repo backend (main) → otomatis terbit di produksi
+#   dev  → cek build saja (tidak menyentuh repo backend)
+#   pull request ke main → cek build saja
+#
 # Butuh (Settings → Secrets and variables → Actions):
 #   - Variable BACKEND_REPOSITORY : pemilik/nama-repo-backend, mis. edopranata/penjualan-backend
 #   - Secret   BACKEND_DEPLOY_KEY : private key SSH yang public key-nya didaftarkan sebagai
@@ -9,15 +14,38 @@ name: Build ke Backend
 
 on:
   push:
+    branches: [main, dev]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: build-to-backend
-  cancel-in-progress: false
+  group: ${{ github.ref == 'refs/heads/main' && 'build-to-backend' || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Pemeriksaan untuk dev / pull request: pastikan frontend bisa di-build.
+  check:
+    if: github.ref != 'refs/heads/main' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependency
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  # Produksi: build lalu commit ke repo backend (main).
   build:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout frontend

@@ -146,6 +146,7 @@ const margin = (form) => {
 const importModal = ref(false)
 const importFile = ref(null)
 const importUpdate = ref(false)
+const importInactive = ref(false)
 const importing = ref(false)
 const importResult = ref(null)
 
@@ -157,6 +158,7 @@ async function runImport() {
     const body = new FormData()
     body.append('file', importFile.value)
     body.append('update', importUpdate.value ? 1 : 0)
+    body.append('inactive', importInactive.value ? 1 : 0)
     const { data } = await http.post('/products/import', body, { timeout: 600000 })
     importResult.value = data.data
     load()
@@ -420,9 +422,17 @@ onMounted(() => {
           Baris dengan kode item sama dan satuan berbeda menjadi satuan tambahan (multi satuan).
         </p>
         <input type="file" accept=".xlsx,.xls,.csv" class="input" @change="importFile = $event.target.files[0]" />
+        <p class="-mt-2 text-xs text-slate-500">
+          File besar (puluhan ribu barang) sebaiknya <b>CSV</b> agar hemat memori server. Ubah dari Excel dengan
+          <code>php artisan products:to-csv file.xlsx</code> (barcode tetap utuh).
+        </p>
         <label class="flex items-start gap-2">
           <input v-model="importUpdate" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
           <span>Perbarui produk yang kodenya sudah ada (nama, kategori, harga). Stok produk lama tidak diubah.</span>
+        </label>
+        <label class="flex items-start gap-2">
+          <input v-model="importInactive" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
+          <span>Jadikan produk baru <b>nonaktif</b> (tidak tampil di kasir sampai diaktifkan). Cocok untuk master awal.</span>
         </label>
         <p class="text-xs text-slate-500">File sangat besar (puluhan ribu baris) lebih cepat diimport lewat server: <code>php artisan products:import "file.xlsx"</code>.</p>
         <div v-if="importResult" class="rounded-lg bg-emerald-50 p-3 text-emerald-800">

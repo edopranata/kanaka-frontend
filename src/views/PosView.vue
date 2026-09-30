@@ -7,6 +7,7 @@ import { useToastStore } from '../stores/toast'
 import { number, rupiah } from '../utils/format'
 import { printReceipt } from '../utils/print'
 import AppIcon from '../components/AppIcon.vue'
+import ScanButton from '../components/ScanButton.vue'
 import AppModal from '../components/AppModal.vue'
 import CustomerPicker from '../components/CustomerPicker.vue'
 import MoneyInput from '../components/MoneyInput.vue'
@@ -70,6 +71,17 @@ async function onSearchEnter() {
     } else if (!products.value.length) {
       toast.error(`Produk "${code}" tidak ditemukan.`)
     }
+  }
+}
+
+/** Scan kamera (beruntun): kode persis langsung masuk keranjang. */
+async function scanToCart(code) {
+  try {
+    const { data } = await http.get('/products/lookup', { params: { code } })
+    addToCart(data.data, data.matched_unit_id)
+    return { ok: true, text: data.data.name }
+  } catch {
+    return { ok: false, text: 'Produk tidak ditemukan' }
   }
 }
 
@@ -342,12 +354,13 @@ onBeforeUnmount(() => {
             ref="searchInput"
             v-model="search"
             type="search"
-            class="input py-2.5 pl-10 text-base"
+            class="input py-2.5 pr-12 pl-10 text-base"
             placeholder="Scan barcode / cari produk (F2)"
             autocomplete="off"
             @input="onSearchInput"
             @keydown.enter.prevent="onSearchEnter"
           />
+          <ScanButton class="absolute top-1/2 right-1.5 h-9 w-9 -translate-y-1/2" title="Scan ke keranjang" continuous :resolve="scanToCart" />
         </div>
         <div class="flex items-start gap-2">
           <div class="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">

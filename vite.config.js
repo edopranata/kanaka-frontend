@@ -45,6 +45,8 @@ export default defineConfig(({ mode }) => {
           globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api\//, /^\/up$/, /^\/storage\//],
+          // Pembaca barcode (ZXing .wasm) tidak di-precache; disimpan setelah pertama kali dipakai.
+          runtimeCaching: [{ urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wasm', expiration: { maxEntries: 4 } } }],
         },
         devOptions: { enabled: false },
       }),

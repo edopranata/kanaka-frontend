@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 import http from '../api/http'
 import { number, rupiah } from '../utils/format'
+import ScanButton from './ScanButton.vue'
 
 /**
  * Kotak pencarian produk (nama/SKU/barcode). Enter pada kode persis langsung memilih produk.
@@ -57,6 +58,18 @@ async function onEnter() {
   }
 }
 
+/** Hasil scan kamera: kode persis langsung dipilih; ditampilkan di pemindai (nama produk / tidak ditemukan). */
+async function scan(code) {
+  try {
+    const { data } = await http.get('/products/lookup', { params: { code, include_inactive: props.includeInactive ? 1 : undefined } })
+    if (props.type && data.data.type !== props.type) return { ok: false, text: `${data.data.name} bukan ${props.type === 'paket' ? 'paket' : 'barang'}` }
+    choose({ ...data.data, matched_unit_id: data.matched_unit_id })
+    return { ok: true, text: data.data.name }
+  } catch {
+    return { ok: false, text: 'Produk tidak ditemukan' }
+  }
+}
+
 function choose(product) {
   emit('select', product)
   term.value = ''
@@ -80,11 +93,12 @@ defineExpose({ focus: () => input.value?.focus() })
 
 <template>
   <div class="relative">
+    <ScanButton class="absolute top-1/2 right-1.5 z-10 h-8 w-8 -translate-y-1/2" title="Scan produk" continuous :resolve="scan" />
     <input
       ref="input"
       v-model="term"
       type="search"
-      class="input"
+      class="input pr-11"
       :placeholder="placeholder"
       autocomplete="off"
       @input="onInput"

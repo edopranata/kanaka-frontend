@@ -7,6 +7,7 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
+import ScanButton from '../components/ScanButton.vue'
 import AppModal from '../components/AppModal.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MoneyInput from '../components/MoneyInput.vue'
@@ -217,7 +218,10 @@ onMounted(() => {
     </PageHeader>
 
     <div class="card mb-4 grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-6">
-      <input v-model="filters.search" type="search" class="input sm:col-span-2" placeholder="Cari nama / SKU / scan barcode…" @keydown.enter="load()" @search="load()" />
+      <div class="relative sm:col-span-2">
+        <input v-model="filters.search" type="search" class="input pr-11" placeholder="Cari nama / SKU / scan barcode…" @keydown.enter="load()" @search="load()" />
+        <ScanButton class="absolute top-1/2 right-1.5 h-8 w-8 -translate-y-1/2" title="Cari produk" @detected="filters.search = $event; filters.active = ''; load()" />
+      </div>
       <select v-model="filters.active" class="input" @change="load()">
         <option value="1">Aktif</option>
         <option value="0">Nonaktif</option>
@@ -332,7 +336,10 @@ onMounted(() => {
         </div>
         <div>
           <label class="label">Barcode (opsional)</label>
-          <input v-model="form.barcode" class="input" :class="{ 'input-error': errors.barcode }" placeholder="Scan barcode di sini" />
+          <div class="relative">
+            <input v-model="form.barcode" class="input pr-11" :class="{ 'input-error': errors.barcode }" placeholder="Scan barcode di sini" />
+            <ScanButton class="absolute top-1/2 right-1.5 h-8 w-8 -translate-y-1/2" title="Barcode produk" @detected="form.barcode = $event" />
+          </div>
           <p v-if="errors.barcode" class="error-text">{{ errors.barcode }}</p>
         </div>
         <div>

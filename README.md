@@ -232,7 +232,7 @@ tambah konstanta + entri katalog, lalu cek di route/frontend; Pemilik otomatis m
 
 ## Menjalankan (development)
 
-Kebutuhan: PHP 8.3+, Composer, Node 20.19+ / 22+.
+Kebutuhan: PHP 8.4.1+, Composer, Node 20.19+ / 22+.
 
 ```bash
 mkdir kanaka && cd kanaka

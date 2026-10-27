@@ -38,6 +38,26 @@ kanaka/
 | **Dashboard** | Penjualan & laba hari ini/bulan ini, grafik 14 hari, produk terlaris, stok menipis, status closing. |
 | **Administrasi** | Pengguna & level akses, log aktivitas (login, void, closing, perubahan harga, dll.), pengaturan aplikasi (khusus pemilik). |
 
+## Printer struk (thermal / Bluetooth)
+
+Diatur **per perangkat** di **Pengaturan → Printer (perangkat ini)** — bisa dibuka semua pengguna, termasuk kasir.
+
+| Cara mencetak | Untuk | Keterangan |
+| --- | --- | --- |
+| **Dialog cetak browser** | Semua | Cara lama; printer harus terpasang di sistem (driver). |
+| **Bluetooth / port COM** (Web Serial) | **PC Windows**, Mac, Linux — Chrome/Edge | Printer Bluetooth yang sudah di-*pairing* (di Windows muncul sebagai *Standard Serial over Bluetooth link (COMx)*) atau printer USB-serial. Struk langsung tercetak tanpa dialog. |
+| **Bluetooth LE** (Web Bluetooth) | Tablet/HP Android, laptop — Chrome/Edge | Untuk printer yang mendukung Bluetooth Low Energy. |
+
+Struk dikirim sebagai perintah **ESC/POS** (isi sama dengan struk HTML): 58 mm = 32 karakter, 80 mm = 48 karakter
+per baris. Lebar kertas bisa disamakan dengan pengaturan printer di perangkat itu. Tersedia **Tes Print** (penggaris
+lebar kertas, perataan, ukuran huruf), **Cetak contoh struk**, **cetak otomatis** setelah transaksi kasir & bon,
+jarak kertas, dan potong kertas. Printer yang sudah dipilih tersambung lagi otomatis saat aplikasi dibuka; bila gagal,
+struk dicetak lewat dialog browser.
+
+Windows (contoh Rongta RPP02N): nyalakan printer → **Settings → Bluetooth & devices → Add device** (PIN biasanya
+`0000` atau `1234`) → di aplikasi pilih **Bluetooth / port COM** → **Hubungkan printer** → pilih port COM printer →
+**Tes Print**. iPhone/iPad (Safari) belum mendukung cetak langsung.
+
 ## Satuan & harga jual
 
 - **Stok dan HPP selalu dalam satuan dasar** produk (mis. PCS). Menjual 1 BOX isi 6 mengurangi stok 6 PCS; HPP transaksi = 6 × HPP per PCS.

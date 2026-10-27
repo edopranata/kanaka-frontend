@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '../api/http'
+import { reconnect as reconnectPrinter } from '../utils/printer'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { hariTanggal, tanggal } from '../utils/format'
@@ -54,7 +55,7 @@ const groups = [
       { name: 'users', label: 'Pengguna', icon: 'user', match: ['users'] },
       { name: 'roles', label: 'Role & Hak Akses', icon: 'shield', match: ['roles'] },
       { name: 'logs', label: 'Log Aktivitas', icon: 'clipboard', match: ['logs'] },
-      { name: 'settings', label: 'Pengaturan Aplikasi', icon: 'cog', match: ['settings'] },
+      { name: 'settings', label: 'Pengaturan', icon: 'cog', match: ['settings'] },
     ],
   },
 ]
@@ -103,6 +104,8 @@ const setOnline = () => (online.value = true)
 const setOffline = () => (online.value = false)
 onMounted(() => {
   checkPendingCash(true)
+  // Sambungkan kembali printer struk perangkat ini (bila memakai printer langsung) agar cetak pertama cepat.
+  reconnectPrinter()
   window.addEventListener('cash-pending-changed', refreshPendingCash)
   window.addEventListener('online', setOnline)
   window.addEventListener('offline', setOffline)

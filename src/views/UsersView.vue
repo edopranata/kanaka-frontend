@@ -15,6 +15,9 @@ const users = ref([])
 const form = ref(null)
 const errors = ref({})
 const saving = ref(false)
+// Kata sandi sementara yang gagal terkirim lewat email → ditampilkan sekali untuk diserahkan langsung.
+const issued = ref(null)
+const busy = ref('')
 
 const roles = ref([])
 // Role yang boleh diberikan oleh pengguna yang sedang login (akses tidak melebihi miliknya).
@@ -29,20 +32,37 @@ async function load() {
 function openForm(user = null) {
   errors.value = {}
   const kasir = assignable().find((role) => role.slug === 'kasir') || assignable().at(-1)
-  form.value = user ? { ...user, password: '' } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true, password: '' }
+  form.value = user ? { ...user } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true }
+}
+
+const formatDate = (value) => new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+const passwordStatus = (user) => {
+  if (!user.must_change_password) return null
+  return new Date(user.password_expires_at) < new Date() ? 'sandi_kedaluwarsa' : 'sandi_sementara'
+}
+
+/** Hasil kirim kata sandi sementara: toast bila terkirim, atau tampilkan kata sandinya bila email gagal. */
+function mailResult(data) {
+  if (data.mail.sent) {
+    toast.success(`Kata sandi sementara dikirim ke ${data.mail.to}.`)
+  } else {
+    issued.value = { user: data.data, password: data.mail.temporary_password, to: data.mail.to }
+  }
 }
 
 async function save() {
   saving.value = true
   errors.value = {}
-  const payload = { ...form.value, email: form.value.email || null, password: form.value.password || null }
+  const { id, name, username, email, role_id, is_active } = form.value
+  const payload = { name, username, email, role_id, is_active }
   try {
-    if (payload.id) {
-      await http.put(`/users/${payload.id}`, payload)
+    if (id) {
+      await http.put(`/users/${id}`, payload)
+      toast.success('Pengguna disimpan.')
     } else {
-      await http.post('/users', payload)
+      const { data } = await http.post('/users', payload)
+      mailResult(data)
     }
-    toast.success('Pengguna disimpan.')
     form.value = null
     load()
   } catch (e) {
@@ -50,6 +70,45 @@ async function save() {
     if (!Object.keys(errors.value).length) toast.error(errorMessage(e))
   } finally {
     saving.value = false
+  }
+}
+
+async function resendPassword(user) {
+  if (!confirm(`Kirim kata sandi sementara baru ke ${user.email}?\n\nKata sandi ${user.name} saat ini tidak berlaku lagi dan semua perangkatnya akan keluar.`)) return
+  busy.value = 'password'
+  try {
+    const { data } = await http.post(`/users/${user.id}/temporary-password`)
+    mailResult(data)
+    form.value = null
+    load()
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    busy.value = ''
+  }
+}
+
+async function resetTwoFactor(user) {
+  if (!confirm(`Nonaktifkan verifikasi 2 langkah ${user.name}?\n\nGunakan bila HP-nya hilang dan kode pemulihan tidak ada. ${user.name} perlu masuk ulang dan bisa mengaktifkannya lagi di Akun Saya.`)) return
+  busy.value = 'two_factor'
+  try {
+    const { data } = await http.delete(`/users/${user.id}/two-factor`)
+    form.value = { ...form.value, two_factor_enabled: data.data.two_factor_enabled }
+    toast.success('Verifikasi 2 langkah dinonaktifkan.')
+    load()
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    busy.value = ''
+  }
+}
+
+async function copyPassword() {
+  try {
+    await navigator.clipboard.writeText(issued.value.password)
+    toast.success('Kata sandi disalin.')
+  } catch {
+    toast.error('Tidak dapat menyalin.')
   }
 }
 
@@ -89,14 +148,26 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
     <div class="card overflow-hidden">
       <div class="table-wrap">
         <table v-stack class="table">
-          <thead><tr><th>Nama</th><th>Nama Pengguna</th><th>Role</th><th>Email</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Nama</th><th>Nama Pengguna</th><th>Role</th><th>Email</th><th>Keamanan</th><th>Status</th><th></th></tr></thead>
           <tbody>
             <tr v-for="user in users" :key="user.id">
               <td class="font-medium">{{ user.name }} <span v-if="user.id === auth.user?.id" class="text-xs text-slate-400">(Anda)</span></td>
               <td>{{ user.username }}</td>
               <td>{{ user.role_label }}</td>
               <td>{{ user.email || '-' }}</td>
-              <td><StatusBadge :status="user.is_active ? 'aktif' : 'nonaktif'" /></td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  <span v-if="user.two_factor_enabled" class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-600/20 ring-inset" title="Verifikasi 2 langkah aktif"><AppIcon name="shield" :size="12" /> 2FA</span>
+                  <span v-if="user.google_linked" class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-600/20 ring-inset" title="Bisa masuk dengan Google">Google</span>
+                  <span v-if="!user.two_factor_enabled && !user.google_linked" class="text-slate-400">-</span>
+                </div>
+              </td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  <StatusBadge :status="user.is_active ? 'aktif' : 'nonaktif'" />
+                  <StatusBadge v-if="passwordStatus(user)" :status="passwordStatus(user)" :title="`Kata sandi sementara berlaku sampai ${formatDate(user.password_expires_at)}`" />
+                </div>
+              </td>
               <td class="text-right">
                 <template v-if="user.can_manage">
                   <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(user)"><AppIcon name="pencil" :size="16" /></button>
@@ -122,8 +193,8 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
           <p v-if="errors.username" class="error-text">{{ errors.username }}</p>
         </div>
         <div>
-          <label class="label">Email (opsional)</label>
-          <input v-model="form.email" type="email" class="input" :class="{ 'input-error': errors.email }" />
+          <label class="label">Email</label>
+          <input v-model.trim="form.email" type="email" class="input" :class="{ 'input-error': errors.email }" autocapitalize="off" required />
           <p v-if="errors.email" class="error-text">{{ errors.email }}</p>
         </div>
         <div>
@@ -134,18 +205,47 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
           </select>
           <p v-if="errors.role_id" class="error-text">{{ errors.role_id }}</p>
         </div>
-        <div>
-          <label class="label">Kata sandi {{ form.id ? '(kosongkan jika tetap)' : '' }}</label>
-          <input v-model="form.password" type="password" class="input" :class="{ 'input-error': errors.password }" autocomplete="new-password" :required="!form.id" />
-          <p v-if="errors.password" class="error-text">{{ errors.password }}</p>
-        </div>
-        <label class="flex items-center gap-2 text-sm sm:col-span-2">
+        <p v-if="!form.id" class="flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800 sm:col-span-2">
+          <AppIcon name="inbox" :size="16" class="mt-px shrink-0" />
+          Kata sandi sementara dikirim otomatis ke email di atas. Pengguna wajib membuat kata sandi baru saat pertama kali masuk.
+        </p>
+        <label v-if="form.id" class="flex items-center gap-2 text-sm sm:col-span-2">
           <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300" :disabled="form.id === auth.user?.id" /> Akun aktif
         </label>
+
+        <!-- Keamanan akun pengguna lain -->
+        <div v-if="form.id && form.id !== auth.user?.id" class="space-y-2 rounded-xl border border-slate-200 p-3 text-sm sm:col-span-2">
+          <p class="font-medium">Keamanan</p>
+          <p v-if="passwordStatus(form)" class="text-xs text-slate-500">Masih memakai kata sandi sementara (berlaku sampai {{ formatDate(form.password_expires_at) }}).</p>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn-secondary btn-sm" :disabled="!!busy" @click="resendPassword(form)"><AppIcon name="inbox" :size="14" /> {{ busy === 'password' ? 'Mengirim…' : 'Kirim kata sandi sementara baru' }}</button>
+            <button v-if="form.two_factor_enabled" type="button" class="btn-secondary btn-sm text-red-600" :disabled="!!busy" @click="resetTwoFactor(form)"><AppIcon name="shield" :size="14" /> Nonaktifkan 2FA</button>
+          </div>
+        </div>
       </form>
       <template #footer>
         <button class="btn-secondary" @click="form = null">Batal</button>
-        <button class="btn-primary" type="submit" form="user-form" :disabled="saving">Simpan</button>
+        <button class="btn-primary" type="submit" form="user-form" :disabled="saving">{{ saving ? 'Menyimpan…' : form.id ? 'Simpan' : 'Simpan & kirim email' }}</button>
+      </template>
+    </AppModal>
+
+    <AppModal v-if="issued" title="Email gagal terkirim" size="sm" @close="issued = null">
+      <div class="space-y-3 text-sm">
+        <p class="rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
+          Kata sandi sementara untuk <b>{{ issued.user.name }}</b> tidak dapat dikirim ke {{ issued.to }}. Periksa pengaturan email (Pengaturan → Keamanan), lalu serahkan kata sandi ini langsung kepada pengguna.
+        </p>
+        <div class="space-y-1 rounded-xl bg-slate-50 p-3">
+          <div class="flex justify-between gap-3"><span class="text-slate-500">Nama pengguna</span><b>{{ issued.user.username }}</b></div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-slate-500">Kata sandi sementara</span>
+            <span class="flex items-center gap-1"><b class="font-mono text-base select-all">{{ issued.password }}</b><button type="button" class="rounded p-1 text-slate-500 hover:bg-slate-200" title="Salin" @click="copyPassword"><AppIcon name="copy" :size="14" /></button></span>
+          </div>
+          <div class="flex justify-between gap-3"><span class="text-slate-500">Berlaku sampai</span><span>{{ formatDate(issued.user.password_expires_at) }}</span></div>
+        </div>
+        <p class="text-xs text-slate-500">Kata sandi ini hanya ditampilkan sekali.</p>
+      </div>
+      <template #footer>
+        <button class="btn-primary" @click="issued = null">Selesai</button>
       </template>
     </AppModal>
   </div>

@@ -235,6 +235,46 @@ Untuk developer: daftar hak akses (kode, label, grup, ketergantungan) ada di `ba
 (`catalog()`); route memakai middleware `permission:a,b`, frontend memakai `auth.can('a')`. Menambah fitur baru =
 tambah konstanta + entri katalog, lalu cek di route/frontend; Pemilik otomatis mendapatkannya.
 
+## Akun pengguna, email & keamanan login
+
+- **Pengguna baru** (menu Pengguna): isi *Nama lengkap, Nama pengguna, Email, Role*. Aplikasi membuat **kata sandi
+  sementara** dan mengirimnya ke email pengguna. Masa berlakunya diatur di **Pengaturan → Keamanan & Email**
+  (bawaan 24 jam). Saat pertama masuk, pengguna **wajib membuat kata sandi sendiri** sebelum bisa membuka menu lain.
+  Bila email gagal terkirim, kata sandi sementara ditampilkan **sekali** ke pengelola untuk diserahkan langsung.
+- **Kirim kata sandi sementara baru** (form ubah pengguna): kata sandi lama tidak berlaku dan semua perangkat
+  pengguna itu keluar. Dari form yang sama, pengelola bisa **menonaktifkan 2FA** pengguna yang kehilangan HP.
+- **Lupa kata sandi?** di halaman masuk: isi nama pengguna atau email. Tautan atur ulang dikirim ke email akun,
+  berlaku 60 menit dan hanya sekali pakai. Pesannya selalu sama, jadi tidak membocorkan akun mana yang terdaftar.
+- **Masuk dengan Google** (opsional): pengguna menautkan akun Google di **Akun Saya**, lalu bisa memakai tombol
+  Google di halaman masuk. Akun Google yang belum ditautkan ditolak. Tombolnya hanya tampil bila `GOOGLE_CLIENT_ID`
+  diisi.
+- **Verifikasi 2 langkah / MFA** (opsional, per pengguna di **Akun Saya**): pindai QR dengan Google Authenticator,
+  Microsoft Authenticator, Authy, dll. Setelah itu login (kata sandi maupun Google) meminta 6 digit kode. Saat
+  aktivasi, aplikasi memberi 8 **kode pemulihan** sekali pakai untuk keadaan HP hilang.
+
+Konfigurasi `.env`:
+
+```dotenv
+# Email (development: Mailtrap sandbox → Email Testing → Inboxes → SMTP)
+MAIL_MAILER=smtp
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=xxxxxxxx
+MAIL_PASSWORD=xxxxxxxx
+MAIL_FROM_ADDRESS="noreply@tokoanda.com"
+MAIL_FROM_NAME="Kanaka"
+
+# Alamat aplikasi di tautan email. Kosong = APP_URL (produksi). Dev dengan "npm run dev": http://localhost:5174
+FRONTEND_URL=
+
+# Opsional: Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application),
+# Authorized JavaScript origins: https://tokoanda.com dan http://localhost:5174
+GOOGLE_CLIENT_ID=
+```
+
+Setelah mengubah `.env`, jalankan `php artisan config:clear`, lalu buka **Pengaturan → Keamanan & Email → Kirim
+email uji**. Email dikirim langsung, tanpa antrean, karena shared hosting tidak menjalankan queue worker.
+
 ## Aturan closing harian
 
 1. **Tanggal usaha.** Setiap transaksi punya tanggal usaha. Normalnya sama dengan hari ini.

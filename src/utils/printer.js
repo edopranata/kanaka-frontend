@@ -37,7 +37,20 @@ watch(printerConfig, (value) => {
   }
 }, { deep: true })
 
-export const printerState = reactive({ connected: false, connecting: false, name: '' })
+export const printerState = reactive({ connected: false, connecting: false, name: '', lastError: '', log: [] })
+
+/** Catatan diagnostik singkat (tampil di Pengaturan → Printer). */
+function log(message) {
+  const time = new Date().toLocaleTimeString('id-ID')
+  printerState.log.unshift(`${time}  ${message}`)
+  printerState.log.splice(12)
+}
+
+/** Batasi lama sebuah langkah agar aplikasi tidak menunggu printer yang diam selamanya. */
+function withTimeout(promise, ms, message) {
+  let timer
+  return Promise.race([promise, new Promise((_, reject) => (timer = setTimeout(() => reject(new Error(message)), ms)))]).finally(() => clearTimeout(timer))
+}
 
 export const support = {
   serial: typeof navigator !== 'undefined' && 'serial' in navigator,
@@ -55,14 +68,58 @@ function portName(info) {
   return 'Port serial / COM'
 }
 
-async function openPort(selected) {
-  if (!selected.readable) await selected.open({ baudRate: 9600 })
+/**
+ * Port serial hanya disimpan (izin dari browser), BUKAN dibiarkan terbuka: printer Bluetooth (SPP) biasanya
+ * memutus koneksi yang menganggur sehingga port "terbuka" tidak lagi menyampaikan data. Port dibuka & ditutup
+ * setiap kali mencetak (lihat writeSerial).
+ */
+function usePort(selected) {
   port = selected
   printerState.connected = true
   printerState.name = portName(selected.getInfo?.())
+  log(`Port dipilih: ${printerState.name} ${JSON.stringify(selected.getInfo?.() || {})}`)
   selected.addEventListener?.('disconnect', () => {
-    if (port === selected) disconnected()
+    if (port === selected) {
+      log('Port dilepas oleh sistem (printer mati / Bluetooth terputus).')
+      disconnected()
+    }
   })
+}
+
+async function closePort(target) {
+  try {
+    if (target && (target.readable || target.writable)) await target.close()
+  } catch {
+    // sudah tertutup / masih dipakai
+  }
+}
+
+async function writeSerial(target, bytes) {
+  const started = performance.now()
+  if (target.readable || target.writable) await closePort(target) // sisa koneksi lama
+  await withTimeout(target.open({ baudRate: 9600 }), 15000, 'Printer tidak merespons saat dihubungkan (15 dtk). Pastikan printer menyala, tidak terhubung ke perangkat lain, dan port COM yang dipilih benar.')
+  log(`Port terbuka (${Math.round(performance.now() - started)} ms)`)
+  const writer = target.writable.getWriter()
+  try {
+    for (let offset = 0; offset < bytes.length; offset += 256) {
+      await withTimeout(writer.write(bytes.slice(offset, offset + 256)), 10000, 'Printer tidak menerima data (10 dtk). Coba matikan-nyalakan printer lalu Tes Print lagi.')
+    }
+    // Tunggu semua data benar-benar terkirim sebelum port ditutup.
+    await withTimeout(writer.close(), 10000, 'Pengiriman data ke printer tidak selesai (10 dtk).')
+    log(`Terkirim ${bytes.length} byte (${Math.round(performance.now() - started)} ms)`)
+  } catch (e) {
+    try {
+      await writer.abort()
+    } catch {
+      // abaikan
+    }
+    throw e
+  } finally {
+    writer.releaseLock?.()
+    // Beri jeda sebentar agar printer selesai menerima sebelum koneksi Bluetooth diputus.
+    await pause(400)
+    await closePort(target)
+  }
 }
 
 async function connectBle(device) {
@@ -95,13 +152,24 @@ function disconnected() {
   printerState.connected = false
 }
 
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 /** Pilih printer (membuka dialog pilihan perangkat dari browser — harus dari klik pengguna). */
 export async function choosePrinter() {
   printerState.connecting = true
   try {
     await disconnect()
     if (printerConfig.mode === 'serial') {
-      await openPort(await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP] }))
+      usePort(await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP] }))
+      // Uji koneksi: kirim perintah inisialisasi (ESC @) — tidak mencetak apa pun.
+      try {
+        await writeSerial(port, new Uint8Array([0x1b, 0x40]))
+      } catch (e) {
+        printerState.lastError = e.message
+        log(`GAGAL uji koneksi: ${e.message}`)
+        disconnected()
+        throw e
+      }
     } else if (printerConfig.mode === 'bluetooth') {
       await connectBle(await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BLE_SERVICES }))
     }
@@ -117,7 +185,7 @@ export async function reconnect() {
   try {
     if (printerConfig.mode === 'serial' && support.serial) {
       const [known] = await navigator.serial.getPorts()
-      if (known) await openPort(known)
+      if (known) usePort(known)
     } else if (printerConfig.mode === 'bluetooth' && navigator.bluetooth?.getDevices) {
       const device = (await navigator.bluetooth.getDevices()).find((item) => item.id === printerConfig.deviceId)
       if (device) await connectBle(device)
@@ -132,7 +200,7 @@ export async function reconnect() {
 
 export async function disconnect() {
   try {
-    if (port) await port.close()
+    await closePort(port)
     if (ble?.device.gatt.connected) ble.device.gatt.disconnect()
   } catch {
     // sudah terputus
@@ -152,35 +220,31 @@ export async function forgetPrinter() {
   printerConfig.deviceId = ''
 }
 
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
 /** Kirim byte ESC/POS ke printer (dipotong kecil-kecil agar buffer printer tidak penuh). */
 export async function sendBytes(bytes) {
-  if (!(await reconnect())) {
-    throw new Error('Printer belum terhubung. Buka Pengaturan → Printer lalu klik "Hubungkan printer".')
-  }
+  printerState.lastError = ''
+  try {
+    if (!(await reconnect())) {
+      throw new Error('Printer belum dipilih. Buka Pengaturan → Printer lalu klik "Hubungkan printer".')
+    }
 
-  if (port) {
-    const writer = port.writable.getWriter()
-    try {
-      for (let offset = 0; offset < bytes.length; offset += 512) {
-        await writer.write(bytes.slice(offset, offset + 512))
+    if (port) return await writeSerial(port, bytes)
+
+    const { characteristic } = ble
+    const size = characteristic.properties.writeWithoutResponse ? 180 : 100
+    for (let offset = 0; offset < bytes.length; offset += size) {
+      const chunk = bytes.slice(offset, offset + size)
+      if (characteristic.properties.writeWithoutResponse) {
+        await characteristic.writeValueWithoutResponse(chunk)
+        await pause(20)
+      } else {
+        await withTimeout(characteristic.writeValue(chunk), 10000, 'Printer Bluetooth tidak merespons (10 dtk).')
       }
-    } finally {
-      writer.releaseLock()
     }
-    return
-  }
-
-  const { characteristic } = ble
-  const size = characteristic.properties.writeWithoutResponse ? 180 : 100
-  for (let offset = 0; offset < bytes.length; offset += size) {
-    const chunk = bytes.slice(offset, offset + size)
-    if (characteristic.properties.writeWithoutResponse) {
-      await characteristic.writeValueWithoutResponse(chunk)
-      await pause(20)
-    } else {
-      await characteristic.writeValue(chunk)
-    }
+    log(`Terkirim ${bytes.length} byte via Bluetooth LE`)
+  } catch (e) {
+    printerState.lastError = e?.message || String(e)
+    log(`GAGAL: ${printerState.lastError}`)
+    throw e
   }
 }

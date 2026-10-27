@@ -21,6 +21,13 @@ const modes = [
   { value: 'bluetooth', label: 'Bluetooth LE', hint: 'Untuk printer yang mendukung Bluetooth Low Energy (BLE), mis. di tablet Android.', available: support.bluetooth },
 ]
 
+// Web Serial / Web Bluetooth hanya ada di koneksi aman: HTTPS atau localhost.
+const secure = window.isSecureContext
+const location = window.location
+const unsupportedHint = secure
+  ? 'Tidak didukung browser ini — gunakan Google Chrome atau Microsoft Edge versi terbaru.'
+  : `Butuh HTTPS atau localhost. Alamat ${location.origin} tidak aman, jadi browser menonaktifkan fitur ini.`
+
 const paper = computed(() => receiptPaper())
 const columns = computed(() => columnsFor(paper.value))
 const connection = computed(() => (printerConfig.mode === 'browser' ? 'Dialog cetak browser' : printerState.connected ? printerState.name : 'Belum terhubung'))
@@ -109,6 +116,12 @@ onMounted(() => reconnect())
       <p class="text-sm text-slate-500">Pengaturan ini hanya berlaku untuk <b>perangkat & browser ini</b> (setiap PC kasir bisa berbeda).</p>
     </div>
 
+    <p v-if="!secure" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+      <AppIcon name="alert" :size="16" class="inline" /> Halaman dibuka lewat <b>{{ location.origin }}</b> (bukan HTTPS / localhost), sehingga cetak langsung
+      ke printer & scan kamera tidak tersedia. Buka lewat <b>https://</b> atau <b>http://localhost</b>; untuk uji dari PC lain di jaringan
+      lokal, tambahkan alamat ini di <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> lalu mulai ulang browser.
+    </p>
+
     <!-- Cara mencetak -->
     <div>
       <p class="label">Cara mencetak</p>
@@ -123,7 +136,7 @@ onMounted(() => reconnect())
           @click="setMode(item.value)"
         >
           <span class="block text-sm font-semibold text-slate-800">{{ item.label }}</span>
-          <span class="mt-0.5 block text-xs text-slate-500">{{ item.available ? item.hint : 'Tidak didukung browser ini — gunakan Google Chrome atau Microsoft Edge versi terbaru.' }}</span>
+          <span class="mt-0.5 block text-xs text-slate-500">{{ item.available ? item.hint : unsupportedHint }}</span>
         </button>
       </div>
     </div>

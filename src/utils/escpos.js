@@ -1,3 +1,4 @@
+import { encode } from 'uqr'
 import { number, waktu } from './format'
 
 /**
@@ -100,6 +101,44 @@ export class EscPos {
     return this.align('left')
   }
 
+  /**
+   * QR sebagai gambar raster (GS v 0), didukung hampir semua printer thermal (berbeda dengan perintah QR
+   * bawaan GS ( k yang tidak tersedia di sebagian printer murah). Hanya selebar QR (bukan selebar kertas) dan
+   * ditengahkan dengan ESC a agar data kecil: area hitam yang lebar membuat printer thermal melambat dan
+   * data besar bisa meluapkan buffer printer (QR tercetak separuh).
+   *
+   * @param {string} text
+   * @param {{ module?: number }} options  ukuran satu kotak QR dalam titik printer (3 kecil · 4 sedang · 5 besar)
+   */
+  qr(text, { module = 4 } = {}) {
+    const { size, data } = encode(text, { ecc: 'L', border: 0 })
+    const quiet = 2
+    const pixels = (size + quiet * 2) * module
+    const widthBytes = Math.ceil(pixels / 8)
+
+    const rows = []
+    for (let y = 0; y < pixels; y++) {
+      const row = new Uint8Array(widthBytes)
+      const my = Math.floor(y / module) - quiet
+      if (my >= 0 && my < size) {
+        for (let x = 0; x < pixels; x++) {
+          const mx = Math.floor(x / module) - quiet
+          if (mx >= 0 && mx < size && data[my][mx]) row[x >> 3] |= 0x80 >> (x & 7)
+        }
+      }
+      rows.push(row)
+    }
+
+    this.align('center')
+    // Per 64 baris piksel agar buffer printer tidak penuh.
+    for (let start = 0; start < rows.length; start += 64) {
+      const band = rows.slice(start, start + 64)
+      this.raw(GS, 0x76, 0x30, 0x00, widthBytes & 0xff, widthBytes >> 8, band.length & 0xff, band.length >> 8)
+      band.forEach((row) => this.bytes.push(...row))
+    }
+    return this.align('left')
+  }
+
   feed(lines = 3) {
     return this.raw(ESC, 0x64, lines)
   }
@@ -119,6 +158,15 @@ export const columnsFor = (paper) => (String(paper) === '80' ? 48 : 32)
 /** "Promo Kopi" atau "Diskon"; tidak menggandakan kata promo bila nama promonya sudah diawali "Promo". */
 export const promoLabel = (item) => (!item.promo ? 'Diskon' : /^promo\b/i.test(item.promo) ? item.promo : `Promo ${item.promo}`)
 
+/**
+ * Baris header struk sesudah nama toko: alamat, alamat 2 (opsional), lalu kontak (Telp / Email sesuai
+ * Pengaturan). Data lama tanpa "contact" memakai telepon.
+ */
+export const headerLines = (store) => [store.address, store.address2, store.contact ?? (store.phone ? `Telp. ${store.phone}` : '')].map((line) => String(line || '').trim()).filter(Boolean)
+
+/** Jarak (baris kosong) antara header dan isi struk: 1–3. */
+export const headerGap = (store) => Math.min(3, Math.max(1, Number(store.header_gap) || 1))
+
 function header(doc, store) {
   doc.align('center').bold(true)
   if (toAscii(store.name).length <= doc.columns / 2) {
@@ -127,18 +175,32 @@ function header(doc, store) {
     doc.wrap(store.name).forEach((line) => doc.line(line))
   }
   doc.bold(false)
-  if (store.address) doc.wrap(store.address).forEach((line) => doc.line(line))
-  if (store.phone) doc.line(`Telp. ${store.phone}`)
-  return doc.align('left')
+  headerLines(store).forEach((text) => doc.wrap(text).forEach((line) => doc.line(line)))
+  doc.align('left')
+  for (let i = 0; i < headerGap(store); i++) doc.line()
+  return doc
+}
+
+/** Baris catatan kaki struk (diatur per baris di Pengaturan, maks. 32 karakter per baris). */
+export const footerLines = (footer) => String(footer || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+
+/** Ukuran kotak QR (titik printer) per pilihan ukuran di Pengaturan → Printer. */
+export const QR_MODULES = { kecil: 3, sedang: 4, besar: 5 }
+
+function footer(doc, store, qrUrl, qrSize) {
+  footerLines(store.receipt_footer).forEach((line) => doc.center(line))
+  if (qrUrl) {
+    doc.line().qr(qrUrl, { module: QR_MODULES[qrSize] ?? QR_MODULES.sedang }).align('center').line('Scan untuk struk digital').align('left')
+  }
 }
 
 /**
  * Struk penjualan / bon — isi sama dengan tampilan cetak HTML (ReceiptPrint.vue).
  *
  * @param {object} sale  data penjualan dari API (SaleResource)
- * @param {{ store: object, columns: number, feed?: number, cut?: boolean }} options
+ * @param {{ store: object, columns: number, feed?: number, cut?: boolean, qrUrl?: string|null }} options
  */
-export function receiptBytes(sale, { store, columns, feed = 3, cut = true }) {
+export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl = null, qrSize = 'sedang' }) {
   const doc = new EscPos(columns)
   header(doc, store).separator()
   doc.line(`No   : ${sale.number}`)
@@ -170,14 +232,14 @@ export function receiptBytes(sale, { store, columns, feed = 3, cut = true }) {
   if (sale.status === 'batal') doc.line().bold(true).center('*** DIBATALKAN ***').bold(false)
 
   doc.separator()
-  if (store.receipt_footer) doc.center(store.receipt_footer)
+  footer(doc, store, qrUrl, qrSize)
   doc.feed(feed)
   if (cut) doc.cut()
   return doc.build()
 }
 
 /** Halaman tes printer: lebar kolom, perataan, huruf tebal/besar, dan contoh baris struk. */
-export function testPageBytes({ store, columns, paper, connection, feed = 3, cut = true }) {
+export function testPageBytes({ store, columns, paper, connection, feed = 3, cut = true, qrUrl = null, qrSize = 'sedang' }) {
   const doc = new EscPos(columns)
   header(doc, store)
   doc.separator('=').align('center').bold(true).line('TES PRINTER').bold(false).line(waktu(new Date().toISOString())).align('left').separator('=')
@@ -200,6 +262,9 @@ export function testPageBytes({ store, columns, paper, connection, feed = 3, cut
   doc.bold(true).size(1, 2).pair('TOTAL', '11.000').size(1, 1).bold(false)
   doc.separator()
   doc.center('Bila penggaris di atas pas satu baris, ukuran kertas sudah benar.')
+  if (qrUrl) {
+    doc.separator().center(`Tes QR (${qrSize}):`).qr(qrUrl, { module: QR_MODULES[qrSize] ?? QR_MODULES.sedang }).center('QR harus utuh & bisa di-scan.')
+  }
   doc.feed(feed)
   if (cut) doc.cut()
   return doc.build()

@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
@@ -17,7 +18,71 @@ const form = ref(null)
 const serverPreview = ref({})
 const errors = ref({})
 const saving = ref(false)
-const tab = ref(canManage ? 'app' : 'printer')
+// ?tab=printer dari pemberitahuan printer di halaman kasir.
+const tab = ref(canManage && useRoute().query.tab !== 'printer' ? 'app' : 'printer')
+
+// Catatan kaki struk diatur per baris (disimpan sebagai teks dipisah baris baru).
+const FOOTER_LINES = 6
+const FOOTER_WIDTH = 32
+const footer = ref([])
+watch(footer, (lines) => form.value && (form.value.receipt_footer = lines.join('\n')), { deep: true })
+const footerPreview = computed(() => {
+  const lines = footer.value.map((line) => line.trim()).filter(Boolean)
+  return ['-'.repeat(FOOTER_WIDTH), ...lines.map((line) => center(line)), ...(form.value?.receipt_qr ? ['', center('[QR]'), center('Scan untuk struk digital')] : [])].join('\n')
+})
+const setFooter = (text) => (footer.value = String(text || '').split('\n').filter((line) => line !== '') || [])
+
+// Header struk: nama toko, alamat, alamat 2 (opsional), kontak (Telp / Email), lalu jarak ke isi struk.
+const HEADER_WIDTH = 48
+const addressSplit = ref(false)
+const center = (text, width = FOOTER_WIDTH) => ' '.repeat(Math.max(0, Math.floor((width - text.length) / 2))) + text
+/** Lipat teks per kata selebar struk 58 mm (sama seperti cetak ESC/POS). */
+function wrapWords(text, width = FOOTER_WIDTH) {
+  const lines = []
+  let current = ''
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    if (current && (current + ' ' + word).length > width) {
+      lines.push(current)
+      current = ''
+    }
+    current = current ? `${current} ${word}` : word
+    while (current.length > width) {
+      lines.push(current.slice(0, width))
+      current = current.slice(width)
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+// Pratinjau header mengikuti ukuran kertas yang dipilih (58 mm = 32 karakter, 80 mm = 48).
+const headerWidth = computed(() => (form.value?.receipt_paper === '80' ? 48 : FOOTER_WIDTH))
+const headerPreview = computed(() => {
+  const f = form.value
+  if (!f) return ''
+  const width = headerWidth.value
+  const contact = f.receipt_contact === 'email' ? (f.store_email ? `Email: ${f.store_email}` : '') : f.store_phone ? `Telp. ${f.store_phone}` : ''
+  const lines = [f.store_name, f.store_address, f.store_address2, contact].filter((line) => String(line || '').trim())
+  return [...lines.flatMap((line) => wrapWords(line, width).map((part) => center(part, width))), ...Array(Number(f.receipt_header_gap) || 1).fill(''), '-'.repeat(width), 'No   : INV-20261027-0001'].join('\n')
+})
+/**
+ * Alamat lama (satu baris panjang) dipecah menjadi Alamat + Alamat 2, utamakan setelah tanda baca yang
+ * paling dekat ke tengah. Tersimpan setelah klik Simpan.
+ */
+function splitAddress(values) {
+  addressSplit.value = false
+  const address = String(values.store_address || '').trim()
+  if (address.length <= HEADER_WIDTH || values.store_address2) return
+  const breaks = [...address.matchAll(/[.,;]?\s+/g)]
+    .map((match) => ({ at: match.index, end: match.index + match[0].length, punct: match[0].trim() !== '' }))
+    .filter(({ at, end }) => at <= HEADER_WIDTH && address.length - end <= HEADER_WIDTH)
+  if (!breaks.length) return
+  const middle = address.length / 2
+  const best = breaks.sort((a, b) => b.punct - a.punct || Math.abs(a.at - middle) - Math.abs(b.at - middle))[0]
+  const punct = address.slice(best.at, best.end).trim()
+  values.store_address = address.slice(0, best.at) + punct
+  values.store_address2 = address.slice(best.end)
+  addressSplit.value = true
+}
 
 const appTabs = [
   { key: 'app', label: 'Aplikasi', icon: 'cog' },
@@ -25,6 +90,7 @@ const appTabs = [
   { key: 'numbering', label: 'Penomoran & Kode', icon: 'tag' },
   { key: 'transaction', label: 'Transaksi & Stok', icon: 'cube' },
   { key: 'closing', label: 'Closing, Kas & Tagihan', icon: 'lock' },
+  { key: 'maintenance', label: 'Pemeliharaan', icon: 'archive' },
 ]
 const printerTab = { key: 'printer', label: 'Printer (perangkat ini)', icon: 'printer' }
 const tabs = canManage ? [...appTabs, printerTab] : [printerTab]
@@ -61,14 +127,51 @@ const skuPreview = (prefix) => `${(prefix || '').toUpperCase()}${'1'.padStart(fo
 const errorTabs = computed(() => {
   const keys = Object.keys(errors.value)
   const fields = {
-    app: ['app_name', 'app_tagline'],
-    store: ['store_name', 'store_address', 'store_phone', 'receipt_footer', 'receipt_paper'],
+    app: ['app_name', 'app_tagline', 'report_'],
+    store: ['store_', 'receipt_'],
     numbering: ['prefix_', 'doc_number', 'sku_', 'package_sku'],
     transaction: ['tax_percent', 'default_', 'package_default', 'expense_categories', 'allow_negative'],
     closing: ['auto_closing', 'auto_billing', 'bill_due_days', 'cash_account_'],
+    maintenance: ['retention_'],
   }
   return Object.keys(fields).filter((tabKey) => keys.some((key) => fields[tabKey].some((field) => key.startsWith(field))))
 })
+
+// Pemeliharaan: pemakaian penyimpanan & pembersihan (log, cache, session, login lama).
+const retention = [
+  { key: 'retention_log_days', label: 'File log', unit: 'hari', min: 1, max: 365, hint: 'Isi laravel.log & log lain yang lebih lama dihapus; juga catatan job gagal.' },
+  { key: 'retention_cache_days', label: 'Cache', unit: 'hari', min: 1, max: 90, hint: 'Cache kedaluwarsa dihapus tiap hari; seluruh cache dikosongkan setiap N hari (dibangun ulang otomatis).' },
+  { key: 'retention_session_hours', label: 'Session browser', unit: 'jam', min: 1, max: 720, hint: 'Session yang tidak aktif lebih lama dihapus. Tidak memengaruhi login kasir.' },
+  { key: 'retention_token_days', label: 'Login tidak dipakai', unit: 'hari', min: 0, max: 365, hint: 'Perangkat yang tidak membuka aplikasi selama N hari harus login ulang. 0 = tidak pernah dihapus.' },
+]
+const maintenance = ref(null)
+const cleaning = ref(false)
+const cleanupResults = ref(null)
+const fileSize = (bytes) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(0, Math.round(bytes / 1024))} KB`)
+const lastRun = computed(() => maintenance.value?.last_run?.ran_at ? new Date(maintenance.value.last_run.ran_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : null)
+
+async function loadMaintenance() {
+  try {
+    maintenance.value = (await http.get('/maintenance')).data.data
+  } catch {
+    // tidak kritis
+  }
+}
+
+async function cleanup() {
+  cleaning.value = true
+  try {
+    const { data } = await http.post('/maintenance/cleanup')
+    cleanupResults.value = data.results
+    maintenance.value = data.data
+    toast.success('Pembersihan selesai.')
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    cleaning.value = false
+  }
+}
+watch(tab, (value) => value === 'maintenance' && canManage && loadMaintenance())
 
 async function save() {
   saving.value = true
@@ -76,6 +179,8 @@ async function save() {
   try {
     const { data } = await http.put('/settings', form.value)
     form.value = data.data
+    addressSplit.value = false
+    setFooter(data.data.receipt_footer)
     serverPreview.value = data.preview
     meta.load(true)
     toast.success('Pengaturan disimpan.')
@@ -92,6 +197,9 @@ onMounted(async () => {
   if (!canManage) return
   const { data } = await http.get('/settings')
   form.value = data.data
+  splitAddress(form.value)
+  setFooter(data.data.receipt_footer)
+  if (!footer.value.length) footer.value.push('')
   serverPreview.value = data.preview
   http.get('/cash/accounts').then(({ data }) => (banks.value = data.data.filter((account) => account.type === 'bank'))).catch(() => {})
 })
@@ -147,28 +255,110 @@ onMounted(async () => {
               <p class="mt-2 text-xl font-semibold">{{ form.app_name || 'Nama aplikasi' }}</p>
               <p class="text-sm text-brand-100">{{ form.app_tagline }}</p>
             </div>
+
+            <h2 class="border-t border-slate-100 pt-4 font-semibold">Kertas laporan (Export PDF)</h2>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="label">Ukuran kertas</label>
+                <div class="grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
+                  <button v-for="paper in ['A4', 'F4', 'Letter', 'Legal']" :key="paper" type="button" class="tab justify-center" :class="{ 'tab-active': form.report_paper === paper }" @click="form.report_paper = paper">{{ paper }}</button>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">{{ { A4: 'A4 · 210 × 297 mm', F4: 'F4 / Folio · 215 × 330 mm', Letter: 'Letter · 216 × 279 mm', Legal: 'Legal · 216 × 356 mm' }[form.report_paper] }}</p>
+              </div>
+              <div>
+                <label class="label">Orientasi</label>
+                <div class="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+                  <button v-for="(label, value) in { auto: 'Otomatis', portrait: 'Portrait', landscape: 'Landscape' }" :key="value" type="button" class="tab justify-center" :class="{ 'tab-active': form.report_orientation === value }" @click="form.report_orientation = value">{{ label }}</button>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">Otomatis: landscape bila kolom laporan terlalu lebar untuk portrait.</p>
+              </div>
+            </div>
           </section>
 
           <!-- Toko & struk -->
           <section v-else-if="tab === 'store'" key="store" class="card space-y-4 p-5">
             <h2 class="font-semibold">Identitas toko & struk</h2>
             <div class="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label class="label">Nama toko</label>
-                <input v-model="form.store_name" class="input" :class="{ 'input-error': errors.store_name }" required />
-              </div>
-              <div>
-                <label class="label">Telepon</label>
-                <input v-model="form.store_phone" class="input" />
-              </div>
               <div class="sm:col-span-2">
-                <label class="label">Alamat</label>
-                <input v-model="form.store_address" class="input" />
+                <p class="label">Header struk</p>
+                <div class="grid gap-3" :class="headerWidth > FOOTER_WIDTH ? 'xl:grid-cols-[minmax(0,1fr)_22rem]' : 'lg:grid-cols-[minmax(0,1fr)_16rem]'">
+                  <div class="space-y-3">
+                    <div>
+                      <label class="mb-1 block text-xs font-medium text-slate-500">Baris 1 · Nama toko</label>
+                      <input v-model="form.store_name" class="input" :class="{ 'input-error': errors.store_name }" maxlength="100" required />
+                      <p v-if="errors.store_name" class="error-text">{{ errors.store_name }}</p>
+                    </div>
+                    <div v-for="field in [{ key: 'store_address', label: 'Baris 2 · Alamat', placeholder: 'mis. Jl. Jend. Sudirman No 12' }, { key: 'store_address2', label: 'Baris 3 · Alamat 2 (opsional)', placeholder: 'mis. Pekanbaru, Riau' }]" :key="field.key">
+                      <label class="mb-1 block text-xs font-medium text-slate-500">{{ field.label }}</label>
+                      <div class="relative">
+                        <input v-model="form[field.key]" class="input pr-14" :class="{ 'input-error': errors[field.key] }" :maxlength="HEADER_WIDTH" :placeholder="field.placeholder" />
+                        <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs tabular-nums" :class="(form[field.key] || '').length > FOOTER_WIDTH ? 'text-amber-600' : 'text-slate-400'">{{ (form[field.key] || '').length }}/{{ FOOTER_WIDTH }}</span>
+                      </div>
+                      <p v-if="errors[field.key]" class="error-text">{{ errors[field.key] }}</p>
+                    </div>
+                    <p v-if="addressSplit" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Alamat lama terlalu panjang untuk satu baris, sudah dipecah otomatis menjadi Alamat &amp; Alamat 2. Periksa lalu klik Simpan.</p>
+                    <div>
+                      <p class="mb-1 block text-xs font-medium text-slate-500">Baris terakhir · Kontak yang dicetak</p>
+                      <div class="mb-2 grid max-w-xs grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+                        <button type="button" class="tab justify-center" :class="{ 'tab-active': form.receipt_contact === 'phone' }" @click="form.receipt_contact = 'phone'">Telp</button>
+                        <button type="button" class="tab justify-center" :class="{ 'tab-active': form.receipt_contact === 'email' }" @click="form.receipt_contact = 'email'">Email</button>
+                      </div>
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        <div>
+                          <input v-model="form.store_phone" class="input" :class="{ 'input-error': errors.store_phone, 'ring-1 ring-brand-300': form.receipt_contact === 'phone' }" maxlength="30" placeholder="Telepon, mis. 0812-3456-7890" />
+                          <p v-if="errors.store_phone" class="error-text">{{ errors.store_phone }}</p>
+                        </div>
+                        <div>
+                          <input v-model="form.store_email" type="email" class="input" :class="{ 'input-error': errors.store_email, 'ring-1 ring-brand-300': form.receipt_contact === 'email' }" maxlength="100" placeholder="Email, mis. toko@contoh.id" />
+                          <p v-if="errors.store_email" class="error-text">{{ errors.store_email }}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p class="mb-1 block text-xs font-medium text-slate-500">Jarak header ke isi struk</p>
+                      <div class="grid max-w-xs grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+                        <button v-for="gap in [1, 2, 3]" :key="gap" type="button" class="tab justify-center" :class="{ 'tab-active': Number(form.receipt_header_gap) === gap }" @click="form.receipt_header_gap = gap">{{ gap }} baris</button>
+                      </div>
+                    </div>
+                    <p class="text-xs text-slate-500">Alamat maks. {{ HEADER_WIDTH }} karakter per baris; lebih dari {{ FOOTER_WIDTH }} karakter akan dilipat menjadi 2 baris di kertas 58 mm. Kontak kosong tidak dicetak.</p>
+                  </div>
+                  <div>
+                    <p class="mb-1 text-xs text-slate-500">Pratinjau ({{ form.receipt_paper }} mm)</p>
+                    <pre class="overflow-x-auto rounded-lg border border-dashed border-slate-300 bg-white p-2 font-mono text-[11px] leading-snug text-slate-700">{{ headerPreview }}</pre>
+                  </div>
+                </div>
               </div>
               <div class="sm:col-span-2">
                 <label class="label">Catatan kaki struk</label>
-                <input v-model="form.receipt_footer" class="input" />
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                  <div class="space-y-2">
+                    <div v-for="(line, index) in footer" :key="index" class="flex items-center gap-2">
+                      <span class="w-5 shrink-0 text-right text-xs text-slate-400">{{ index + 1 }}</span>
+                      <div class="relative min-w-0 flex-1">
+                        <input v-model="footer[index]" class="input pr-14" :maxlength="FOOTER_WIDTH" placeholder="mis. Terima kasih atas kunjungan Anda" />
+                        <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs tabular-nums" :class="line.length >= FOOTER_WIDTH ? 'text-amber-600' : 'text-slate-400'">{{ line.length }}/{{ FOOTER_WIDTH }}</span>
+                      </div>
+                      <button type="button" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus baris" @click="footer.splice(index, 1)"><AppIcon name="trash" :size="16" /></button>
+                    </div>
+                    <button type="button" class="btn-secondary btn-sm" :disabled="footer.length >= FOOTER_LINES" @click="footer.push('')">
+                      <AppIcon name="plus" :size="14" /> Tambah baris
+                    </button>
+                    <p class="text-xs text-slate-500">Maks. {{ FOOTER_LINES }} baris × {{ FOOTER_WIDTH }} karakter (lebar struk 58 mm). Baris kosong diabaikan.</p>
+                    <p v-if="errors.receipt_footer" class="error-text">{{ errors.receipt_footer }}</p>
+                  </div>
+                  <div>
+                    <p class="mb-1 text-xs text-slate-500">Pratinjau (58 mm)</p>
+                    <pre class="rounded-lg border border-dashed border-slate-300 bg-white p-2 font-mono text-[11px] leading-snug text-slate-700">{{ footerPreview }}</pre>
+                  </div>
+                </div>
               </div>
+              <label class="flex items-start gap-3 sm:col-span-2">
+                <input v-model="form.receipt_qr" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
+                <span>
+                  <span class="block text-sm font-medium">Tampilkan QR struk digital</span>
+                  <span class="block text-xs text-slate-500">QR di bawah struk; pembeli scan untuk membuka struk ini secara online (tanpa login).</span>
+                </span>
+              </label>
               <div>
                 <label class="label">Ukuran kertas struk</label>
                 <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
@@ -278,7 +468,7 @@ onMounted(async () => {
           </section>
 
           <!-- Closing & tagihan -->
-          <section v-else key="closing" class="card space-y-4 p-5">
+          <section v-else-if="tab === 'closing'" key="closing" class="card space-y-4 p-5">
             <h2 class="font-semibold">Closing harian & tagihan</h2>
             <label class="flex items-start gap-3">
               <input v-model="form.auto_closing" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
@@ -314,6 +504,74 @@ onMounted(async () => {
             <div class="max-w-xs">
               <label class="label">Jatuh tempo tagihan (hari setelah tagihan dibuat)</label>
               <input v-model.number="form.bill_due_days" type="number" min="0" max="90" class="input" :class="{ 'input-error': errors.bill_due_days }" />
+            </div>
+          </section>
+
+          <!-- Pemeliharaan -->
+          <section v-else key="maintenance" class="space-y-5">
+            <div class="card space-y-4 p-5">
+              <div>
+                <h2 class="font-semibold">Masa simpan</h2>
+                <p class="text-sm text-slate-500">Dibersihkan otomatis setiap hari pukul 02:30 oleh scheduler (cron). Data transaksi &amp; Log Aktivitas tidak dihapus.</p>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div v-for="item in retention" :key="item.key">
+                  <label class="label">{{ item.label }}</label>
+                  <div class="relative">
+                    <input v-model.number="form[item.key]" type="number" :min="item.min" :max="item.max" class="input pr-14" :class="{ 'input-error': errors[item.key] }" />
+                    <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-400">{{ item.unit }}</span>
+                  </div>
+                  <p v-if="errors[item.key]" class="error-text">{{ errors[item.key] }}</p>
+                  <p class="mt-1 text-xs text-slate-500">{{ item.hint }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card space-y-4 p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 class="font-semibold">Penyimpanan saat ini</h2>
+                  <p class="text-sm text-slate-500">{{ lastRun ? `Pembersihan terakhir: ${lastRun}` : 'Belum pernah dibersihkan.' }}</p>
+                </div>
+                <button type="button" class="btn-secondary btn-sm" :disabled="cleaning" @click="cleanup"><AppIcon name="refresh" :size="14" :class="{ 'animate-spin': cleaning }" /> {{ cleaning ? 'Membersihkan…' : 'Bersihkan sekarang' }}</button>
+              </div>
+              <div v-if="maintenance" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">File log</p>
+                  <p class="text-lg font-semibold tabular-nums">{{ fileSize(maintenance.logs.bytes) }}</p>
+                  <p class="text-xs text-slate-500">{{ maintenance.logs.files }} file</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Cache</p>
+                  <p class="text-lg font-semibold tabular-nums">{{ maintenance.cache.entries ?? '-' }}</p>
+                  <p class="text-xs text-slate-500">entri · {{ maintenance.cache.driver }}</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Session browser</p>
+                  <p class="text-lg font-semibold tabular-nums">{{ maintenance.sessions.entries ?? '-' }}</p>
+                  <p class="text-xs text-slate-500">session · {{ maintenance.sessions.driver }}</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500">Login (token)</p>
+                  <p class="text-lg font-semibold tabular-nums">{{ maintenance.tokens.entries }}</p>
+                  <p class="text-xs text-slate-500">perangkat / sesi login</p>
+                </div>
+              </div>
+              <p v-else class="text-sm text-slate-400">Memuat…</p>
+              <div v-if="cleanupResults || maintenance?.last_run?.results" class="table-wrap">
+                <table class="table">
+                  <thead><tr><th>Bagian</th><th>Aturan</th><th class="num">Dihapus</th><th class="num">Ukuran</th></tr></thead>
+                  <tbody>
+                    <tr v-for="row in cleanupResults || maintenance.last_run.results" :key="row.key">
+                      <td class="font-medium">{{ row.label }}</td>
+                      <td class="text-slate-500">{{ row.detail }}</td>
+                      <td class="num">{{ row.count }}</td>
+                      <td class="num">{{ row.bytes ? fileSize(row.bytes) : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="text-xs text-slate-500">Perubahan masa simpan berlaku setelah klik <b>Simpan Pengaturan</b>. Di hosting, pastikan cron menjalankan <code>scripts/cron-schedule.sh</code> setiap menit.</p>
             </div>
           </section>
         </Transition>

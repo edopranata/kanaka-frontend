@@ -6,7 +6,7 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah } from '../utils/format'
 import { printReceipt } from '../utils/print'
-import { printerConfig } from '../utils/printer'
+import { printerConfig, printerNotice } from '../utils/printer'
 import AppIcon from '../components/AppIcon.vue'
 import ScanButton from '../components/ScanButton.vue'
 import AppModal from '../components/AppModal.vue'
@@ -16,6 +16,7 @@ import PackageOptions from '../components/PackageOptions.vue'
 import { lineKey, optionalComponents, packagePrice } from '../utils/cart'
 import { bestPromo } from '../utils/discount'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
+import PrinterStatus from '../components/PrinterStatus.vue'
 
 const CART_KEY = 'penjualan.cart'
 
@@ -435,6 +436,7 @@ onBeforeUnmount(() => {
         />
         <p v-else class="input bg-slate-50 text-slate-500">Pelanggan umum</p>
       </div>
+      <PrinterStatus class="border-b border-slate-100" />
 
       <div class="min-h-40 flex-1 overflow-y-auto">
         <div v-if="!cart.items.length" class="flex h-full flex-col items-center justify-center p-8 text-center text-sm text-slate-400">
@@ -578,6 +580,7 @@ onBeforeUnmount(() => {
             <p class="text-lg font-semibold text-emerald-700 tabular-nums">{{ rupiah(lastSale.change) }}</p>
           </div>
         </div>
+        <PrinterStatus v-if="printerNotice && printerNotice.level !== 'info'" class="rounded-lg text-left" />
       </div>
       <template #footer>
         <button class="btn-secondary" @click="printReceipt(lastSale)"><AppIcon name="printer" :size="18" /> Cetak Struk</button>

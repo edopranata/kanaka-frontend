@@ -1,4 +1,4 @@
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 /**
  * Printer struk per perangkat (disimpan di browser ini, bukan di server):
@@ -21,9 +21,9 @@ const BLE_SERVICES = [
 
 function load() {
   try {
-    return { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, deviceId: '', ...JSON.parse(localStorage.getItem(KEY) || '{}') }
+    return { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, qrSize: 'sedang', deviceId: '', hideBrowserNotice: false, ...JSON.parse(localStorage.getItem(KEY) || '{}') }
   } catch {
-    return { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, deviceId: '' }
+    return { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, qrSize: 'sedang', deviceId: '', hideBrowserNotice: false }
   }
 }
 
@@ -36,7 +36,8 @@ watch(printerConfig, (value) => {
   }
 }, { deep: true })
 
-export const printerState = reactive({ connected: false, connecting: false, name: '', lastError: '', log: [] })
+// status: '' (belum dicek) | checking | ready | unpaired (belum dipilih) | offline (tidak merespons / terputus)
+export const printerState = reactive({ connected: false, connecting: false, name: '', lastError: '', status: '', log: [] })
 
 /** Catatan diagnostik singkat (tampil di Pengaturan → Printer). */
 function log(message) {
@@ -81,6 +82,8 @@ function usePort(selected) {
     if (port === selected) {
       log('Port dilepas oleh sistem (printer mati / Bluetooth terputus).')
       disconnected()
+      printerState.status = 'offline'
+      printerState.lastError = 'Printer terputus (mati / Bluetooth terputus).'
     }
   })
 }
@@ -112,13 +115,22 @@ async function writeSerialNow(target, bytes) {
   clearTimeout(idleTimer)
   const started = performance.now()
   if (!target.writable) {
-    await withTimeout(target.open({ baudRate: 9600 }), 15000, 'Printer tidak merespons saat dihubungkan (15 dtk). Pastikan printer menyala, tidak terhubung ke perangkat lain, dan port yang dipilih benar.')
+    try {
+      await withTimeout(target.open({ baudRate: 9600 }), 15000, 'Printer tidak merespons saat dihubungkan (15 dtk). Pastikan printer menyala, tidak terhubung ke perangkat lain, dan port yang dipilih benar.')
+    } catch (e) {
+      // Pesan bawaan browser ("Failed to open serial port") diganti penjelasan yang bisa ditindaklanjuti kasir.
+      if (/failed to open/i.test(e?.message)) throw new Error('Port printer tidak bisa dibuka: printer mati, di luar jangkauan Bluetooth, atau sedang terhubung ke perangkat lain.')
+      throw e
+    }
     log(`Port terbuka (${Math.round(performance.now() - started)} ms)`)
   }
   const writer = target.writable.getWriter()
   try {
     for (let offset = 0; offset < bytes.length; offset += 256) {
       await withTimeout(writer.write(bytes.slice(offset, offset + 256)), 10000, 'Printer tidak menerima data (10 dtk). Coba matikan-nyalakan printer lalu Tes Print lagi.')
+      // Jeda kecil (±10 KB/dtk) agar buffer printer tidak meluap — printer tanpa kontrol aliran data
+      // membuang data berlebih sehingga gambar/QR tercetak separuh.
+      await pause(25)
     }
     await withTimeout(writer.ready, 10000, 'Pengiriman data ke printer tidak selesai (10 dtk).')
     log(`Dikirim ${bytes.length} byte ke antrean (${Math.round(performance.now() - started)} ms)`)
@@ -157,7 +169,12 @@ async function connectBle(device) {
         printerState.connected = true
         printerState.name = device.name || 'Printer Bluetooth'
         printerConfig.deviceId = device.id
-        device.addEventListener('gattserverdisconnected', () => ble?.device === device && disconnected(), { once: true })
+        device.addEventListener('gattserverdisconnected', () => {
+          if (ble?.device !== device) return
+          disconnected()
+          printerState.status = 'offline'
+          printerState.lastError = 'Printer Bluetooth terputus.'
+        }, { once: true })
         return
       }
     }
@@ -170,6 +187,7 @@ function disconnected() {
   port = null
   ble = null
   printerState.connected = false
+  printerState.status = ''
 }
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -190,11 +208,14 @@ export async function choosePrinter() {
         printerState.lastError = e.message
         log(`GAGAL uji koneksi: ${e.message}`)
         disconnected()
+        printerState.status = 'offline'
         throw e
       }
     } else if (printerConfig.mode === 'bluetooth') {
       await connectBle(await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BLE_SERVICES }))
     }
+    printerState.status = 'ready'
+    printerState.lastError = ''
   } finally {
     printerState.connecting = false
   }
@@ -251,7 +272,11 @@ export async function sendBytes(bytes) {
       throw new Error('Printer belum dipilih. Buka Pengaturan → Printer lalu klik "Hubungkan printer".')
     }
 
-    if (port) return await writeSerial(port, bytes)
+    if (port) {
+      await writeSerial(port, bytes)
+      printerState.status = 'ready'
+      return
+    }
 
     const { characteristic } = ble
     const size = characteristic.properties.writeWithoutResponse ? 180 : 100
@@ -265,9 +290,57 @@ export async function sendBytes(bytes) {
       }
     }
     log(`Terkirim ${bytes.length} byte via Bluetooth LE`)
+    printerState.status = 'ready'
   } catch (e) {
+    printerState.status = printerState.connected ? 'offline' : 'unpaired'
     printerState.lastError = e?.message || String(e)
     log(`GAGAL: ${printerState.lastError}`)
     throw e
   }
 }
+
+/**
+ * Cek printer tanpa mencetak: sambungkan printer yang sudah dipilih lalu kirim perintah inisialisasi (ESC @).
+ * Hasilnya di printerState.status (lihat printerNotice).
+ */
+export async function checkPrinter() {
+  if (!isDirect() || printerState.status === 'checking') return printerState.status
+  if (!support[printerConfig.mode]) return (printerState.status = 'offline')
+  printerState.status = 'checking'
+  try {
+    if (!(await reconnect())) return (printerState.status = 'unpaired')
+    if (port) await writeSerial(port, new Uint8Array([0x1b, 0x40]))
+    printerState.status = 'ready'
+    printerState.lastError = ''
+    log('Cek printer: siap')
+  } catch (e) {
+    printerState.status = 'offline'
+    printerState.lastError = e?.message || String(e)
+    log(`Cek printer GAGAL: ${printerState.lastError}`)
+  }
+  return printerState.status
+}
+
+/**
+ * Pemberitahuan status printer untuk halaman kasir: null bila siap (atau sedang memakai dialog browser dan
+ * pemberitahuannya disembunyikan).
+ * level: info | warn | error
+ */
+export const printerNotice = computed(() => {
+  if (printerConfig.mode === 'browser') {
+    return printerConfig.hideBrowserNotice ? null : { level: 'info', key: 'browser', title: 'Printer struk belum diatur di perangkat ini', detail: 'Struk dicetak lewat dialog cetak browser. Atur printer Bluetooth / COM agar struk langsung tercetak.' }
+  }
+  if (!support[printerConfig.mode]) {
+    return { level: 'error', key: 'unsupported', title: 'Browser tidak bisa terhubung ke printer', detail: window.isSecureContext ? 'Gunakan Google Chrome atau Microsoft Edge versi terbaru.' : 'Buka aplikasi lewat HTTPS agar bisa mencetak langsung ke printer.' }
+  }
+  switch (printerState.status) {
+    case 'checking':
+      return { level: 'info', key: 'checking', title: 'Memeriksa printer…', detail: 'Menyambungkan ke printer.' }
+    case 'unpaired':
+      return { level: 'warn', key: 'unpaired', title: 'Printer belum dipilih di perangkat ini', detail: 'Buka Pengaturan → Printer lalu klik "Hubungkan printer".' }
+    case 'offline':
+      return { level: 'error', key: 'offline', title: 'Printer tidak terhubung', detail: `${printerState.lastError || 'Printer tidak merespons.'} Pastikan printer menyala & Bluetooth tersambung, lalu klik Cek lagi.` }
+    default:
+      return null
+  }
+})

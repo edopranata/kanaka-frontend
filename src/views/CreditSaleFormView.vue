@@ -15,6 +15,7 @@ import { lineKey, optionalComponents, packagePrice } from '../utils/cart'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
+import PrinterStatus from '../components/PrinterStatus.vue'
 
 const meta = useMetaStore()
 const toast = useToastStore()
@@ -142,6 +143,7 @@ onMounted(() => {
 <template>
   <div class="stagger">
     <PageHeader title="Bon Baru" subtitle="Penjualan kredit: barang diambil sekarang, dibayar lewat tagihan bulanan" :back="{ name: 'credit-sales' }" />
+    <PrinterStatus class="mb-4 rounded-xl" />
 
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
       <section class="card space-y-4 p-5">

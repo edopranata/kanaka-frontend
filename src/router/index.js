@@ -7,6 +7,15 @@ const view = (name) => () => import(`../views/${name}.vue`)
 
 const routes = [
   {
+    // Struk digital publik (QR di struk) — tanpa login & tanpa menu aplikasi.
+    path: '/struk/:token',
+    name: 'public-receipt',
+    component: view('ReceiptPublicView'),
+    meta: { public: true, title: 'Struk digital' },
+  },
+  // Tautan pendek untuk QR di struk (QR lebih kecil & cepat dicetak).
+  { path: '/s/:token', redirect: (to) => ({ name: 'public-receipt', params: { token: to.params.token } }) },
+  {
     path: '/login',
     name: 'login',
     component: view('LoginView'),

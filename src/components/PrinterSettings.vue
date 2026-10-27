@@ -60,6 +60,7 @@ async function connect() {
     await choosePrinter()
     toast.success(`Terhubung ke ${printerState.name}.`)
   } catch (e) {
+    // NotFoundError = dialog pilihan ditutup tanpa memilih.
     if (e?.name !== 'NotFoundError') toast.error(e?.message || 'Printer tidak dapat dihubungkan.')
   }
 }
@@ -150,6 +151,14 @@ onMounted(() => reconnect())
         <button v-if="printerState.connected" class="btn-secondary" @click="forget">Lupakan</button>
       </div>
     </div>
+
+    <p v-if="isDirect() && printerState.lastError" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+      <AppIcon name="alert" :size="16" class="inline" /> {{ printerState.lastError }}
+    </p>
+    <details v-if="isDirect() && printerState.log.length" class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+      <summary class="cursor-pointer font-medium">Diagnostik printer</summary>
+      <pre class="mt-2 font-mono whitespace-pre-wrap">{{ printerState.log.join('\n') }}</pre>
+    </details>
 
     <!-- Kertas & opsi -->
     <div class="grid gap-4 sm:grid-cols-2">

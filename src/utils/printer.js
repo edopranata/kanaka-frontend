@@ -9,7 +9,6 @@ import { reactive, watch } from 'vue'
  * Mode serial & bluetooth mengirim perintah ESC/POS langsung tanpa dialog cetak (Chrome / Edge).
  */
 const KEY = 'penjualan.printer'
-const SPP = '00001101-0000-1000-8000-00805f9b34fb'
 // Layanan BLE umum printer thermal (ISSC/Microchip, 18F0, FF00, E781…).
 const BLE_SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb',
@@ -65,13 +64,13 @@ export const isDirect = () => printerConfig.mode === 'serial' || printerConfig.m
 function portName(info) {
   if (info?.bluetoothServiceClassId) return 'Printer Bluetooth (serial)'
   if (info?.usbVendorId) return `Printer USB (${info.usbVendorId.toString(16)}:${(info.usbProductId || 0).toString(16)})`
-  return 'Port serial / COM'
+  return 'Printer (port serial / COM)'
 }
 
 /**
- * Port serial hanya disimpan (izin dari browser), BUKAN dibiarkan terbuka: printer Bluetooth (SPP) biasanya
- * memutus koneksi yang menganggur sehingga port "terbuka" tidak lagi menyampaikan data. Port dibuka & ditutup
- * setiap kali mencetak (lihat writeSerial).
+ * Port serial disimpan saat dipilih (izin dari browser). Port dibuka saat mencetak dan ditutup otomatis
+ * setelah beberapa detik menganggur (lihat writeSerial), karena printer Bluetooth (SPP) memutus koneksi
+ * yang lama menganggur.
  */
 function usePort(selected) {
   port = selected
@@ -94,32 +93,53 @@ async function closePort(target) {
   }
 }
 
-async function writeSerial(target, bytes) {
+let idleTimer = null
+let queue = Promise.resolve()
+
+/**
+ * Tulis ke port serial. Port dibuka bila perlu lalu DIBIARKAN TERBUKA beberapa detik setelah menulis:
+ * write() selesai begitu data masuk antrean sistem, padahal koneksi Bluetooth ke printer baru tersambung
+ * ±1–2 detik setelah port dibuka — bila port langsung ditutup, data belum sampai & tidak tercetak.
+ * Setelah menganggur, port ditutup (printer Bluetooth memutus koneksi yang lama menganggur).
+ */
+function writeSerial(target, bytes) {
+  const job = queue.then(() => writeSerialNow(target, bytes))
+  queue = job.catch(() => {})
+  return job
+}
+
+async function writeSerialNow(target, bytes) {
+  clearTimeout(idleTimer)
   const started = performance.now()
-  if (target.readable || target.writable) await closePort(target) // sisa koneksi lama
-  await withTimeout(target.open({ baudRate: 9600 }), 15000, 'Printer tidak merespons saat dihubungkan (15 dtk). Pastikan printer menyala, tidak terhubung ke perangkat lain, dan port COM yang dipilih benar.')
-  log(`Port terbuka (${Math.round(performance.now() - started)} ms)`)
+  if (!target.writable) {
+    await withTimeout(target.open({ baudRate: 9600 }), 15000, 'Printer tidak merespons saat dihubungkan (15 dtk). Pastikan printer menyala, tidak terhubung ke perangkat lain, dan port yang dipilih benar.')
+    log(`Port terbuka (${Math.round(performance.now() - started)} ms)`)
+  }
   const writer = target.writable.getWriter()
   try {
     for (let offset = 0; offset < bytes.length; offset += 256) {
       await withTimeout(writer.write(bytes.slice(offset, offset + 256)), 10000, 'Printer tidak menerima data (10 dtk). Coba matikan-nyalakan printer lalu Tes Print lagi.')
     }
-    // Tunggu semua data benar-benar terkirim sebelum port ditutup.
-    await withTimeout(writer.close(), 10000, 'Pengiriman data ke printer tidak selesai (10 dtk).')
-    log(`Terkirim ${bytes.length} byte (${Math.round(performance.now() - started)} ms)`)
+    await withTimeout(writer.ready, 10000, 'Pengiriman data ke printer tidak selesai (10 dtk).')
+    log(`Dikirim ${bytes.length} byte ke antrean (${Math.round(performance.now() - started)} ms)`)
   } catch (e) {
     try {
       await writer.abort()
     } catch {
       // abaikan
     }
-    throw e
-  } finally {
-    writer.releaseLock?.()
-    // Beri jeda sebentar agar printer selesai menerima sebelum koneksi Bluetooth diputus.
-    await pause(400)
+    writer.releaseLock()
     await closePort(target)
+    throw e
   }
+  writer.releaseLock()
+
+  // Tutup setelah menganggur: cukup lama agar koneksi Bluetooth tersambung & semua data terkirim.
+  const hold = Math.max(5000, bytes.length * 5)
+  idleTimer = setTimeout(async () => {
+    await closePort(target)
+    log('Port ditutup (menganggur)')
+  }, hold)
 }
 
 async function connectBle(device) {
@@ -160,7 +180,9 @@ export async function choosePrinter() {
   try {
     await disconnect()
     if (printerConfig.mode === 'serial') {
-      usePort(await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP] }))
+      // Tanpa allowedBluetoothServiceClassIds: daftar hanya berisi port serial sistem (COMx di Windows,
+      // cu.NAMA di Mac). Entri Bluetooth bawaan Chrome gagal dibuka untuk printer SPP seperti RPP02N.
+      usePort(await navigator.serial.requestPort())
       // Uji koneksi: kirim perintah inisialisasi (ESC @) — tidak mencetak apa pun.
       try {
         await writeSerial(port, new Uint8Array([0x1b, 0x40]))
@@ -199,6 +221,7 @@ export async function reconnect() {
 }
 
 export async function disconnect() {
+  clearTimeout(idleTimer)
   try {
     await closePort(port)
     if (ble?.device.gatt.connected) ble.device.gatt.disconnect()

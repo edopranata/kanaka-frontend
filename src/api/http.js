@@ -30,6 +30,10 @@ http.interceptors.response.use(
         location.assign(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`)
       }
     }
+    // Masih memakai kata sandi sementara: wajib membuat kata sandi baru dulu.
+    if (error.response?.status === 403 && error.response.data?.code === 'password_change_required' && !location.pathname.startsWith('/ganti-kata-sandi')) {
+      location.assign(`/ganti-kata-sandi?redirect=${encodeURIComponent(location.pathname + location.search)}`)
+    }
     return Promise.reject(error)
   },
 )

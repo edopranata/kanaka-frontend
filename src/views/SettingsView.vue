@@ -90,6 +90,7 @@ const appTabs = [
   { key: 'numbering', label: 'Penomoran & Kode', icon: 'tag' },
   { key: 'transaction', label: 'Transaksi & Stok', icon: 'cube' },
   { key: 'closing', label: 'Closing, Kas & Tagihan', icon: 'lock' },
+  { key: 'security', label: 'Keamanan & Email', icon: 'shield' },
   { key: 'maintenance', label: 'Pemeliharaan', icon: 'archive' },
 ]
 const printerTab = { key: 'printer', label: 'Printer (perangkat ini)', icon: 'printer' }
@@ -132,6 +133,7 @@ const errorTabs = computed(() => {
     numbering: ['prefix_', 'doc_number', 'sku_', 'package_sku'],
     transaction: ['tax_percent', 'default_', 'package_default', 'expense_categories', 'allow_negative'],
     closing: ['auto_closing', 'auto_billing', 'bill_due_days', 'cash_account_'],
+    security: ['temp_password'],
     maintenance: ['retention_'],
   }
   return Object.keys(fields).filter((tabKey) => keys.some((key) => fields[tabKey].some((field) => key.startsWith(field))))
@@ -173,12 +175,33 @@ async function cleanup() {
 }
 watch(tab, (value) => value === 'maintenance' && canManage && loadMaintenance())
 
+// Keamanan: konfigurasi email & login Google dari .env (hanya ditampilkan) + email uji.
+const system = ref(null)
+const sendingTestMail = ref(false)
+const tempPasswordLabel = computed(() => {
+  const hours = Number(form.value?.temp_password_hours) || 0
+  return hours % 24 === 0 && hours ? `${hours / 24} hari` : `${hours} jam`
+})
+
+async function testMail() {
+  sendingTestMail.value = true
+  try {
+    const { data } = await http.post('/settings/test-mail')
+    toast.success(data.message)
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    sendingTestMail.value = false
+  }
+}
+
 async function save() {
   saving.value = true
   errors.value = {}
   try {
     const { data } = await http.put('/settings', form.value)
     form.value = data.data
+    system.value = data.system
     addressSplit.value = false
     setFooter(data.data.receipt_footer)
     serverPreview.value = data.preview
@@ -197,6 +220,7 @@ onMounted(async () => {
   if (!canManage) return
   const { data } = await http.get('/settings')
   form.value = data.data
+  system.value = data.system
   splitAddress(form.value)
   setFooter(data.data.receipt_footer)
   if (!footer.value.length) footer.value.push('')
@@ -504,6 +528,57 @@ onMounted(async () => {
             <div class="max-w-xs">
               <label class="label">Jatuh tempo tagihan (hari setelah tagihan dibuat)</label>
               <input v-model.number="form.bill_due_days" type="number" min="0" max="90" class="input" :class="{ 'input-error': errors.bill_due_days }" />
+            </div>
+          </section>
+
+          <!-- Keamanan & email -->
+          <section v-else-if="tab === 'security'" key="security" class="space-y-5">
+            <div class="card space-y-4 p-5">
+              <div>
+                <h2 class="font-semibold">Pengguna baru &amp; atur ulang kata sandi</h2>
+                <p class="text-sm text-slate-500">Saat pengguna dibuat (atau pemilik mengirim ulang dari menu Pengguna), kata sandi sementara dikirim ke email pengguna. Pengguna wajib membuat kata sandi sendiri saat pertama masuk.</p>
+              </div>
+              <div class="max-w-xs">
+                <label class="label">Masa berlaku kata sandi sementara</label>
+                <div class="relative">
+                  <input v-model.number="form.temp_password_hours" type="number" min="1" max="168" class="input pr-14" :class="{ 'input-error': errors.temp_password_hours }" />
+                  <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-400">jam</span>
+                </div>
+                <p v-if="errors.temp_password_hours" class="error-text">{{ errors.temp_password_hours }}</p>
+                <p v-else class="mt-1 text-xs text-slate-500">= {{ tempPasswordLabel }}. Maks. 168 jam (7 hari). Setelah lewat, pengguna memakai "Lupa kata sandi?" atau minta dikirim ulang.</p>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="hours in [12, 24, 48, 72]" :key="hours" type="button" class="tab" :class="{ 'tab-active': Number(form.temp_password_hours) === hours }" @click="form.temp_password_hours = hours">{{ hours % 24 ? `${hours} jam` : `${hours / 24} hari` }}</button>
+              </div>
+            </div>
+
+            <div v-if="system" class="card space-y-4 p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 class="font-semibold">Email &amp; login (dari file .env server)</h2>
+                  <p class="text-sm text-slate-500">Diubah di file .env (MAIL_*, FRONTEND_URL, GOOGLE_CLIENT_ID), lalu jalankan <code class="rounded bg-slate-100 px-1">php artisan config:clear</code>.</p>
+                </div>
+                <button type="button" class="btn-secondary btn-sm" :disabled="sendingTestMail || !auth.user?.email" :title="auth.user?.email ? '' : 'Akun Anda belum memiliki email'" @click="testMail">
+                  <AppIcon name="inbox" :size="14" /> {{ sendingTestMail ? 'Mengirim…' : `Kirim email uji${auth.user?.email ? ` ke ${auth.user.email}` : ''}` }}
+                </button>
+              </div>
+              <dl class="divide-y divide-slate-100 rounded-xl border border-slate-200 text-sm">
+                <div class="flex flex-wrap justify-between gap-x-4 gap-y-0.5 px-3 py-2">
+                  <dt class="text-slate-500">Pengiriman email</dt>
+                  <dd class="font-medium">
+                    {{ system.mailer }}{{ system.mail_host ? ` · ${system.mail_host}` : '' }}
+                    <span v-if="['log', 'array'].includes(system.mailer)" class="ml-1 text-xs font-normal text-amber-700">(email tidak benar-benar dikirim)</span>
+                  </dd>
+                </div>
+                <div class="flex flex-wrap justify-between gap-x-4 gap-y-0.5 px-3 py-2"><dt class="text-slate-500">Alamat pengirim</dt><dd class="font-medium">{{ system.mail_from }}</dd></div>
+                <div class="flex flex-wrap justify-between gap-x-4 gap-y-0.5 px-3 py-2"><dt class="text-slate-500">Alamat aplikasi di email</dt><dd class="font-medium break-all">{{ system.frontend_url }}</dd></div>
+                <div class="flex flex-wrap justify-between gap-x-4 gap-y-0.5 px-3 py-2"><dt class="text-slate-500">Tautan lupa kata sandi berlaku</dt><dd class="font-medium">{{ system.reset_link_minutes }} menit</dd></div>
+                <div class="flex flex-wrap justify-between gap-x-4 gap-y-0.5 px-3 py-2">
+                  <dt class="text-slate-500">Masuk dengan Google</dt>
+                  <dd class="font-medium" :class="system.google_enabled ? 'text-emerald-700' : 'text-slate-500'">{{ system.google_enabled ? 'Aktif' : 'Tidak aktif (GOOGLE_CLIENT_ID kosong)' }}</dd>
+                </div>
+              </dl>
+              <p class="text-xs text-slate-500">Verifikasi 2 langkah (MFA) dan tautan akun Google diatur masing-masing pengguna di menu Akun Saya.</p>
             </div>
           </section>
 

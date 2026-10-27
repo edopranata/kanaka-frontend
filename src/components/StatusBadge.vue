@@ -28,6 +28,8 @@ const styles = {
   berakhir: ['Berakhir', 'bg-slate-100 text-slate-500 ring-slate-500/20'],
   master: ['Belum dijual', 'bg-slate-100 text-slate-600 ring-slate-500/20'],
   terbuka: ['Belum Closing', 'bg-amber-50 text-amber-700 ring-amber-600/20'],
+  sandi_sementara: ['Sandi sementara', 'bg-amber-50 text-amber-700 ring-amber-600/20'],
+  sandi_kedaluwarsa: ['Sandi kedaluwarsa', 'bg-red-50 text-red-700 ring-red-600/20'],
 }
 
 const style = computed(() => styles[props.status] || [props.status, 'bg-slate-100 text-slate-600 ring-slate-500/20'])

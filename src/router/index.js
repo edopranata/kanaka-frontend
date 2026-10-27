@@ -22,6 +22,26 @@ const routes = [
     meta: { guest: true, title: 'Masuk' },
   },
   {
+    path: '/lupa-kata-sandi',
+    name: 'forgot-password',
+    component: view('ForgotPasswordView'),
+    meta: { guest: true, title: 'Lupa kata sandi' },
+  },
+  {
+    // Tautan dari email "Lupa kata sandi" — bisa dibuka walau sedang login di perangkat ini.
+    path: '/reset-kata-sandi',
+    name: 'reset-password',
+    component: view('ResetPasswordView'),
+    meta: { public: true, title: 'Atur ulang kata sandi' },
+  },
+  {
+    // Wajib setelah masuk dengan kata sandi sementara (akun baru / diatur ulang pemilik).
+    path: '/ganti-kata-sandi',
+    name: 'change-password',
+    component: view('ChangePasswordView'),
+    meta: { auth: true, title: 'Buat kata sandi baru' },
+  },
+  {
     path: '/',
     component: AppLayout,
     meta: { auth: true },
@@ -87,6 +107,11 @@ router.beforeEach(async (to) => {
   }
   if (auth.isAuthenticated) {
     await auth.fetchUser().catch(() => {})
+    if (!to.meta.public) {
+      if (auth.mustChangePassword && to.name !== 'change-password') return { name: 'change-password', query: { redirect: to.fullPath } }
+      if (!auth.mustChangePassword && auth.user && to.name === 'change-password') return auth.homePath()
+    }
+    if (auth.mustChangePassword) return
     await useMetaStore().load().catch(() => {})
 
     if (to.meta.permission && !auth.can(to.meta.permission)) {

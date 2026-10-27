@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { columnsFor, receiptBytes, testPageBytes } from '../utils/escpos'
-import { printWithBrowser, receiptPaper } from '../utils/print'
+import { printWithBrowser, receiptPaper, receiptUrl } from '../utils/print'
 import { choosePrinter, disconnect, forgetPrinter, isDirect, printerConfig, printerState, reconnect, sendBytes, support } from '../utils/printer'
 import AppIcon from './AppIcon.vue'
 import ReceiptPrint from './ReceiptPrint.vue'
@@ -52,6 +52,7 @@ const sample = computed(() => ({
   paid: 20000,
   change: 3600,
   status: 'selesai',
+  receipt_token: 'CONTOH',
 }))
 const showSample = ref(false)
 
@@ -95,7 +96,7 @@ function testPrint() {
     showSample.value = true
     return setTimeout(printWithBrowser, 50)
   }
-  run(testPageBytes({ ...options, paper: paper.value, connection: connection.value }))
+  run(testPageBytes({ ...options, paper: paper.value, connection: connection.value, qrUrl: `${window.location.origin}/s/CONTOH`, qrSize: printerConfig.qrSize }))
 }
 
 function samplePrint() {
@@ -103,7 +104,7 @@ function samplePrint() {
     showSample.value = true
     return setTimeout(printWithBrowser, 50)
   }
-  run(receiptBytes(sample.value, { store: meta.store, columns: columns.value, feed: printerConfig.feed, cut: printerConfig.cut }))
+  run(receiptBytes(sample.value, { store: meta.store, columns: columns.value, feed: printerConfig.feed, cut: printerConfig.cut, qrUrl: receiptUrl(sample.value), qrSize: printerConfig.qrSize }))
 }
 
 onMounted(() => reconnect())
@@ -183,6 +184,13 @@ onMounted(() => reconnect())
           <button type="button" class="tab justify-center" :class="{ 'tab-active': printerConfig.paper === '80' }" @click="printerConfig.paper = '80'">80 mm</button>
         </div>
         <p class="mt-1 text-xs text-slate-500">{{ paper }} mm = {{ columns }} karakter per baris. Samakan dengan pengaturan kertas di printer.</p>
+      </div>
+      <div v-if="meta.app.receipt_qr !== false">
+        <p class="label">Ukuran QR struk digital</p>
+        <div class="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+          <button v-for="(label, value) in { kecil: 'Kecil ±12 mm', sedang: 'Sedang ±17 mm', besar: 'Besar ±21 mm' }" :key="value" type="button" class="tab justify-center" :class="{ 'tab-active': printerConfig.qrSize === value }" @click="printerConfig.qrSize = value">{{ label }}</button>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">QR kecil lebih cepat dicetak; pastikan masih bisa di-scan HP pembeli (Tes Print).</p>
       </div>
       <div>
         <label class="label">Jarak kertas setelah struk (baris)</label>

@@ -1,16 +1,22 @@
 <script setup>
 import { useMetaStore } from '../stores/meta'
 import { number, waktu } from '../utils/format'
-import { promoLabel } from '../utils/escpos'
-import { receiptPaper } from '../utils/print'
+import { computed } from 'vue'
+import { renderSVG } from 'uqr'
+import { footerLines, headerGap, headerLines, promoLabel } from '../utils/escpos'
+import { receiptPaper, receiptUrl } from '../utils/print'
 
 /**
  * Struk thermal (58/80mm). Hanya tampil saat dicetak lewat printReceipt().
  */
-defineProps({
+const props = defineProps({
   sale: { type: Object, required: true },
 })
 const meta = useMetaStore()
+const qrSvg = computed(() => {
+  const url = receiptUrl(props.sale)
+  return url ? renderSVG(url, { ecc: 'L', border: 2 }) : ''
+})
 </script>
 
 <template>
@@ -19,9 +25,9 @@ const meta = useMetaStore()
       <div class="receipt" :class="{ narrow: receiptPaper() === '58' }">
         <div class="center">
           <p class="bold big">{{ meta.store.name }}</p>
-          <p v-if="meta.store.address">{{ meta.store.address }}</p>
-          <p v-if="meta.store.phone">Telp. {{ meta.store.phone }}</p>
+          <p v-for="(line, index) in headerLines(meta.store)" :key="index">{{ line }}</p>
         </div>
+        <div :style="{ height: `${headerGap(meta.store) * 1.35}em` }" />
         <hr />
         <p>No : {{ sale.number }}</p>
         <p>Tgl: {{ waktu(sale.created_at) }}</p>
@@ -58,7 +64,12 @@ const meta = useMetaStore()
         </template>
         <p v-if="sale.status === 'batal'" class="center bold">*** DIBATALKAN ***</p>
         <hr />
-        <p class="center">{{ meta.store.receipt_footer }}</p>
+        <p v-for="(line, index) in footerLines(meta.store.receipt_footer)" :key="index" class="center">{{ line }}</p>
+        <template v-if="qrSvg">
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div class="qr" v-html="qrSvg" />
+          <p class="center">Scan untuk struk digital</p>
+        </template>
       </div>
     </div>
   </Teleport>
@@ -93,6 +104,18 @@ const meta = useMetaStore()
 }
 .item {
   margin-bottom: 2px;
+}
+.qr {
+  width: 20mm;
+  margin: 6px auto 2px;
+}
+.narrow .qr {
+  width: 17mm;
+}
+.qr :deep(svg) {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 hr {
   border: 0;

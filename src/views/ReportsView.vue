@@ -4,6 +4,7 @@ import http, { download, errorMessage } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { monthStart, today } from '../utils/format'
+import { downloadReportPdf } from '../utils/reportPdf'
 import AppIcon from '../components/AppIcon.vue'
 import DateRange from '../components/DateRange.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -19,6 +20,9 @@ const filters = reactive({ from: monthStart(), to: today(), category_id: '', low
 const report = ref(null)
 const loading = ref(false)
 const exporting = ref(false)
+const exportingPdf = ref(false)
+const orientationLabels = { auto: 'orientasi otomatis', portrait: 'portrait', landscape: 'landscape' }
+const pdfPaper = computed(() => `${meta.app.report_paper || 'A4'} · ${orientationLabels[meta.app.report_orientation] || orientationLabels.auto}`)
 
 const current = computed(() => types.value.find((type) => type.key === active.value))
 const params = computed(() => ({
@@ -58,6 +62,19 @@ async function exportExcel() {
   }
 }
 
+// PDF dibuat di browser dengan tata letak sama seperti Excel; kertas & orientasi dari Pengaturan → Aplikasi.
+async function exportPdf() {
+  exportingPdf.value = true
+  try {
+    const suffix = current.value?.dated ? `${filters.from}_${filters.to}` : today()
+    await downloadReportPdf(report.value, { storeName: meta.store.name, paper: meta.app.report_paper, orientation: meta.app.report_orientation }, `Laporan ${report.value.title} ${suffix}.pdf`)
+  } catch (e) {
+    toast.error(`PDF gagal dibuat: ${e?.message || e}`)
+  } finally {
+    exportingPdf.value = false
+  }
+}
+
 const print = () => window.print()
 
 onMounted(async () => {
@@ -70,9 +87,10 @@ onMounted(async () => {
 
 <template>
   <div class="stagger">
-    <PageHeader title="Laporan" subtitle="Pilih jenis laporan, atur periode, lalu cetak atau export ke Excel" class="no-print">
+    <PageHeader title="Laporan" subtitle="Pilih jenis laporan, atur periode, lalu cetak atau export ke PDF / Excel" class="no-print">
       <template #actions>
         <button class="btn-secondary" :disabled="!report" @click="print"><AppIcon name="printer" :size="16" /> Cetak</button>
+        <button class="btn-secondary" :disabled="!report || loading || exportingPdf" :title="`Kertas ${pdfPaper} (Pengaturan → Aplikasi)`" @click="exportPdf"><AppIcon name="document" :size="16" /> {{ exportingPdf ? 'Membuat PDF…' : 'Export PDF' }}</button>
         <button class="btn-primary" :disabled="!report || exporting" @click="exportExcel"><AppIcon name="download" :size="16" /> {{ exporting ? 'Mengunduh…' : 'Export Excel' }}</button>
       </template>
     </PageHeader>

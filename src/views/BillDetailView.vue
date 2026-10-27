@@ -5,6 +5,7 @@ import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah, tanggal } from '../utils/format'
+import { headerLines } from '../utils/escpos'
 import AppIcon from '../components/AppIcon.vue'
 import BankSelect from '../components/BankSelect.vue'
 import AppModal from '../components/AppModal.vue'
@@ -95,8 +96,7 @@ onMounted(load)
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
             <p class="text-lg font-bold text-slate-900">{{ meta.store.name }}</p>
-            <p v-if="meta.store.address" class="text-sm text-slate-500">{{ meta.store.address }}</p>
-            <p v-if="meta.store.phone" class="text-sm text-slate-500">Telp. {{ meta.store.phone }}</p>
+            <p v-for="(line, index) in headerLines(meta.store)" :key="index" class="text-sm text-slate-500">{{ line }}</p>
           </div>
           <div class="text-right">
             <p class="text-2xl font-bold tracking-wide text-brand-700">TAGIHAN</p>

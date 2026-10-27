@@ -243,9 +243,17 @@ tambah konstanta + entri katalog, lalu cek di route/frontend; Pemilik otomatis m
    *Kas seharusnya* per orang = saldo akhir kemarin + mutasi hari ini (penjualan & pelunasan tunai, pengeluaran,
    bayar titipan, setor bank, serah terima). Selisih hitung dibukukan ke kas orang tersebut, sehingga saldo besok
    sesuai uang yang benar-benar ada. Saldo rekening bank ditampilkan sebagai rekap.
-3. **Closing otomatis** berjalan **setiap pukul 00:00** (`php artisan closing:auto`). Semua tanggal sebelum hari ini
-   yang belum di-closing manual akan ditutup otomatis (tanpa hitung kas fisik). Hari yang sudah di-closing manual dilewati.
-   Bisa dimatikan di Pengaturan Toko.
+3. **Closing otomatis** berjalan **setiap pukul 00:00** (`php artisan closing:auto`, dijadwalkan tiap jam agar closing
+   yang terlewat langsung dikejar). Semua tanggal sebelum hari ini yang belum di-closing manual akan ditutup otomatis
+   (tanpa hitung kas fisik). Hari yang sudah di-closing manual dilewati. Bisa dimatikan di Pengaturan Toko.
+
+   ```
+   php artisan closing:auto --dry-run              # lihat tanggal yang akan di-closing (tidak menyimpan)
+   php artisan closing:auto                        # closing semua tanggal yang lewat (s.d. kemarin)
+   php artisan closing:auto --until=2026-10-20     # closing hanya s.d. tanggal tertentu
+   php artisan closing:auto --force                # tetap jalan walau closing otomatis dimatikan di Pengaturan
+   php artisan schedule:work                       # development: jalankan semua jadwal di terminal (tanpa cron)
+   ```
 4. Closing **berurutan** per tanggal. Setelah di-closing, transaksi dan pengeluaran pada tanggal itu **terkunci**
    (tidak bisa di-void/diubah).
 5. Hanya **pemilik** yang bisa membatalkan closing, dan hanya closing terakhir (untuk koreksi).
@@ -291,11 +299,14 @@ Test backend: `cd backend && php artisan test`
 
 1. **Backend**: deploy Laravel seperti biasa (MySQL: ubah `DB_*` di `.env`, pastikan `APP_TIMEZONE=Asia/Jakarta`),
    jalankan `php artisan migrate --force --seed`, lalu segera ganti kata sandi `owner` di menu Akun Saya.
-2. **Cron (wajib untuk closing otomatis & tagihan bulanan)**:
+2. **Cron (wajib untuk closing otomatis, tagihan bulanan & pemeliharaan)**, setiap menit:
    ```
-   * * * * * cd /path/ke/backend && php artisan schedule:run >> /dev/null 2>&1
+   * * * * * /bin/bash /path/ke/backend/scripts/cron-schedule.sh
    ```
-   Jika server sempat mati saat tengah malam, closing yang tertinggal akan dikerjakan pada jalannya perintah berikutnya
+   Skrip memilih PHP ≥ 8.4 lalu menjalankan `php artisan schedule:run` (closing tiap jam, tagihan tanggal 1,
+   `maintenance:cleanup` tiap hari 02:30). Masa simpan log/cache/session/login: **Pengaturan → Pemeliharaan**;
+   simulasi: `php artisan maintenance:cleanup --dry-run`.
+   Jika server sempat mati saat tengah malam, closing yang tertinggal dikerjakan pada jam berikutnya
    (atau jalankan manual `php artisan closing:auto`).
 3. **Frontend disajikan Laravel (paling sederhana, satu domain)**: di folder `frontend` jalankan
    ```

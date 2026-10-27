@@ -1,26 +1,33 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
+import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
+import PrinterSettings from '../components/PrinterSettings.vue'
 
+const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
+// Pengaturan aplikasi hanya pemilik; tab Printer (per perangkat) untuk semua pengguna.
+const canManage = auth.can('settings.manage')
 const form = ref(null)
 const serverPreview = ref({})
 const errors = ref({})
 const saving = ref(false)
-const tab = ref('app')
+const tab = ref(canManage ? 'app' : 'printer')
 
-const tabs = [
+const appTabs = [
   { key: 'app', label: 'Aplikasi', icon: 'cog' },
   { key: 'store', label: 'Toko & Struk', icon: 'receipt' },
   { key: 'numbering', label: 'Penomoran & Kode', icon: 'tag' },
   { key: 'transaction', label: 'Transaksi & Stok', icon: 'cube' },
   { key: 'closing', label: 'Closing, Kas & Tagihan', icon: 'lock' },
 ]
+const printerTab = { key: 'printer', label: 'Printer (perangkat ini)', icon: 'printer' }
+const tabs = canManage ? [...appTabs, printerTab] : [printerTab]
 
 const documents = [
   { key: 'prefix_sale', type: 'sale', label: 'Nota penjualan (kasir)' },
@@ -82,6 +89,7 @@ async function save() {
 }
 
 onMounted(async () => {
+  if (!canManage) return
   const { data } = await http.get('/settings')
   form.value = data.data
   serverPreview.value = data.preview
@@ -91,13 +99,13 @@ onMounted(async () => {
 
 <template>
   <div class="stagger">
-    <PageHeader title="Pengaturan Aplikasi" subtitle="Hanya dapat diakses dan diubah oleh Pemilik">
-      <template #actions>
+    <PageHeader :title="canManage ? 'Pengaturan Aplikasi' : 'Pengaturan'" :subtitle="canManage ? 'Pengaturan aplikasi hanya oleh Pemilik; printer diatur per perangkat' : 'Printer struk di perangkat ini'">
+      <template v-if="canManage && tab !== 'printer'" #actions>
         <button class="btn-primary" :disabled="saving || !form" @click="save"><AppIcon name="check" :size="16" /> {{ saving ? 'Menyimpan…' : 'Simpan Pengaturan' }}</button>
       </template>
     </PageHeader>
 
-    <div v-if="form" class="grid gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
+    <div v-if="form || !canManage" class="grid gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
       <!-- Navigasi tab -->
       <nav class="flex gap-1 overflow-x-auto rounded-xl bg-slate-200/60 p-1 lg:flex-col lg:self-start lg:bg-transparent lg:p-0">
         <button
@@ -114,7 +122,10 @@ onMounted(async () => {
         </button>
       </nav>
 
-      <form @submit.prevent="save">
+      <Transition v-if="tab === 'printer'" name="page" appear>
+        <PrinterSettings />
+      </Transition>
+      <form v-else @submit.prevent="save">
         <Transition name="page" mode="out-in">
           <!-- Aplikasi -->
           <section v-if="tab === 'app'" key="app" class="card space-y-4 p-5">

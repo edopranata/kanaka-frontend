@@ -54,7 +54,7 @@ const routes = [
       { path: 'role', name: 'roles', component: view('RolesView'), meta: { title: 'Role & Hak Akses', permission: 'roles.manage' } },
       { path: 'pengguna', name: 'users', component: view('UsersView'), meta: { title: 'Pengguna', permission: 'users.manage' } },
       { path: 'log-aktivitas', name: 'logs', component: view('ActivityLogsView'), meta: { title: 'Log Aktivitas', permission: 'logs.view' } },
-      { path: 'pengaturan', name: 'settings', component: view('SettingsView'), meta: { title: 'Pengaturan Aplikasi', permission: 'settings.manage' } },
+      { path: 'pengaturan', name: 'settings', component: view('SettingsView'), meta: { title: 'Pengaturan' } },
       { path: 'akun', name: 'account', component: view('AccountView'), meta: { title: 'Akun Saya' } },
     ],
   },

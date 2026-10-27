@@ -1,6 +1,8 @@
 <script setup>
 import { useMetaStore } from '../stores/meta'
 import { number, waktu } from '../utils/format'
+import { promoLabel } from '../utils/escpos'
+import { receiptPaper } from '../utils/print'
 
 /**
  * Struk thermal (58/80mm). Hanya tampil saat dicetak lewat printReceipt().
@@ -14,7 +16,7 @@ const meta = useMetaStore()
 <template>
   <Teleport to="body">
     <div class="receipt-print">
-      <div class="receipt" :class="{ narrow: meta.app.receipt_paper === '58' }">
+      <div class="receipt" :class="{ narrow: receiptPaper() === '58' }">
         <div class="center">
           <p class="bold big">{{ meta.store.name }}</p>
           <p v-if="meta.store.address">{{ meta.store.address }}</p>
@@ -34,7 +36,7 @@ const meta = useMetaStore()
             <span>{{ number(item.qty * item.price) }}</span>
           </p>
           <p v-if="item.discount" class="row">
-            <span>&nbsp;&nbsp;{{ item.promo ? `Promo ${item.promo}` : 'Diskon' }}</span>
+            <span>&nbsp;&nbsp;{{ promoLabel(item) }}</span>
             <span>-{{ number(item.discount) }}</span>
           </p>
         </div>

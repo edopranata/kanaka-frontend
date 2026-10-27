@@ -5,6 +5,7 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah } from '../utils/format'
 import { printReceipt } from '../utils/print'
+import { printerConfig } from '../utils/printer'
 import { bestPromo } from '../utils/discount'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
@@ -115,6 +116,7 @@ async function save() {
       notes: form.notes || null,
     })
     lastSale.value = data.data
+    if (printerConfig.autoPrint) nextTick(() => printReceipt(data.data))
     Object.assign(form, { items: [], notes: '' })
     const { data: summary } = await http.get(`/customers/${customer.value.id}/receivable`)
     receivable.value = summary.data
@@ -243,7 +245,7 @@ onMounted(() => {
         <p class="text-sm text-slate-500">Dicatat sebagai piutang dan akan masuk tagihan bulan ini.</p>
       </div>
       <template #footer>
-        <button class="btn-secondary" @click="printReceipt"><AppIcon name="printer" :size="16" /> Cetak Nota</button>
+        <button class="btn-secondary" @click="printReceipt(lastSale)"><AppIcon name="printer" :size="16" /> Cetak Nota</button>
         <button class="btn-secondary" @click="newBon(false)">Pelanggan Lain</button>
         <button class="btn-primary" @click="newBon(true)">Bon Baru</button>
       </template>

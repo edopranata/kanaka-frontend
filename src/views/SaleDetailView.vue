@@ -52,7 +52,7 @@ onMounted(load)
   <div class="stagger">
     <PageHeader :title="sale?.number || 'Detail Penjualan'" :subtitle="sale ? waktu(sale.created_at) : ''" :back="sale?.payment_method === 'piutang' ? { name: 'credit-sales' } : { name: 'sales' }">
       <template v-if="sale" #actions>
-        <button class="btn-secondary" @click="printReceipt"><AppIcon name="printer" :size="16" /> Cetak Struk</button>
+        <button class="btn-secondary" @click="printReceipt(sale)"><AppIcon name="printer" :size="16" /> Cetak Struk</button>
         <button v-if="auth.can('sales.void') && sale.status === 'selesai' && !sale.bill" class="btn-danger" @click="voiding = true">
           <AppIcon name="ban" :size="16" /> Batalkan
         </button>

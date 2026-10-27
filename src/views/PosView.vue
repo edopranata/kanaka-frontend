@@ -6,6 +6,7 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah } from '../utils/format'
 import { printReceipt } from '../utils/print'
+import { printerConfig } from '../utils/printer'
 import AppIcon from '../components/AppIcon.vue'
 import ScanButton from '../components/ScanButton.vue'
 import AppModal from '../components/AppModal.vue'
@@ -290,6 +291,7 @@ async function pay() {
     })
     lastSale.value = data.data
     payModal.value = false
+    if (printerConfig.autoPrint) nextTick(() => printReceipt(data.data))
     clearCart(false)
     search.value = ''
     loadProducts()
@@ -578,7 +580,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <template #footer>
-        <button class="btn-secondary" @click="printReceipt"><AppIcon name="printer" :size="18" /> Cetak Struk</button>
+        <button class="btn-secondary" @click="printReceipt(lastSale)"><AppIcon name="printer" :size="18" /> Cetak Struk</button>
         <button class="btn-primary" @click="newTransaction">Transaksi Baru (Enter)</button>
       </template>
     </AppModal>

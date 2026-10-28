@@ -10,7 +10,9 @@ import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToastStore()
@@ -64,8 +66,8 @@ onMounted(() => switchTab(tab.value))
   <div class="stagger">
     <PageHeader title="Barang Titipan" subtitle="Konsinyasi: bayar supplier hanya untuk barang yang terjual, sisa diretur atau terbawa ke periode berikutnya">
       <template #actions>
-        <RouterLink :to="{ name: 'consignment-settle' }" class="btn-secondary"><AppIcon name="calculator" :size="16" /> Selesaikan Titipan</RouterLink>
-        <RouterLink :to="{ name: 'consignment-receive' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Titipan Masuk</RouterLink>
+        <RouterLink v-if="auth.can('consignments.settle')" :to="{ name: 'consignment-settle' }" class="btn-secondary"><AppIcon name="calculator" :size="16" /> Selesaikan Titipan</RouterLink>
+        <RouterLink v-if="auth.can('consignments.receive')" :to="{ name: 'consignment-receive' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Titipan Masuk</RouterLink>
       </template>
     </PageHeader>
 
@@ -104,7 +106,7 @@ onMounted(() => switchTab(tab.value))
                   <td>{{ row.last_settled ? tanggal(row.last_settled) : 'Belum pernah' }}</td>
                   <td class="num font-semibold" :class="{ 'text-red-600': row.outstanding }">{{ rupiah(row.outstanding, false) }}</td>
                   <td class="text-right">
-                    <RouterLink v-if="row.open_qty" :to="{ name: 'consignment-settle', query: { supplier_id: row.supplier.id } }" class="btn-secondary btn-sm">Selesaikan</RouterLink>
+                    <RouterLink v-if="row.open_qty && auth.can('consignments.settle')" :to="{ name: 'consignment-settle', query: { supplier_id: row.supplier.id } }" class="btn-secondary btn-sm">Selesaikan</RouterLink>
                   </td>
                 </tr>
               </tbody>

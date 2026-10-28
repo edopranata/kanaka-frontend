@@ -8,7 +8,9 @@ import AppIcon from '../components/AppIcon.vue'
 import ConfirmReason from '../components/ConfirmReason.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const route = useRoute()
 const toast = useToastStore()
 const purchase = ref(null)
@@ -50,7 +52,7 @@ onMounted(load)
     <PageHeader :title="purchase?.number || 'Detail Pembelian'" :subtitle="purchase ? tanggal(purchase.date, 'long') : ''" :back="{ name: 'purchases' }">
       <template v-if="purchase" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak</button>
-        <button v-if="purchase.status === 'selesai'" class="btn-danger" @click="voiding = true"><AppIcon name="ban" :size="16" /> Batalkan</button>
+        <button v-if="purchase.status === 'selesai' && auth.can('purchases.void')" class="btn-danger" @click="voiding = true"><AppIcon name="ban" :size="16" /> Batalkan</button>
       </template>
     </PageHeader>
 

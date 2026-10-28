@@ -10,7 +10,9 @@ import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
 const filters = reactive({ from: monthStart(), to: today(), type: '' })
@@ -38,8 +40,8 @@ onMounted(() => load())
   <div class="stagger">
     <PageHeader title="Penyesuaian & Stok Opname" subtitle="Koreksi stok: barang masuk/keluar di luar pembelian & penjualan, serta hitung fisik">
       <template #actions>
-        <RouterLink :to="{ name: 'adjustment-create', query: { type: 'opname' } }" class="btn-secondary"><AppIcon name="clipboard" :size="16" /> Stok Opname</RouterLink>
-        <RouterLink :to="{ name: 'adjustment-create' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Penyesuaian</RouterLink>
+        <RouterLink v-if="auth.can('stock.opname')" :to="{ name: 'adjustment-create', query: { type: 'opname' } }" class="btn-secondary"><AppIcon name="clipboard" :size="16" /> Stok Opname</RouterLink>
+        <RouterLink v-if="auth.can('stock.adjust')" :to="{ name: 'adjustment-create' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Penyesuaian</RouterLink>
       </template>
     </PageHeader>
 

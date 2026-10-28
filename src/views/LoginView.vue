@@ -109,7 +109,7 @@ watch(step, async (value) => value === 'login' && (await nextTick(), showGoogle(
         <div class="flex items-center gap-3 text-xs text-slate-400"><span class="h-px flex-1 bg-slate-200" />atau<span class="h-px flex-1 bg-slate-200" /></div>
         <div ref="googleButton" class="flex min-h-10 justify-center" />
         <p v-if="googleError" class="text-center text-xs text-red-600">{{ googleError }}</p>
-        <p v-else class="text-center text-xs text-slate-500">Akun Google harus ditautkan dulu di menu Akun Saya.</p>
+        <p v-else class="text-center text-xs text-slate-500">Akun Google harus ditautkan dulu di menu Profil Saya.</p>
       </template>
     </form>
 

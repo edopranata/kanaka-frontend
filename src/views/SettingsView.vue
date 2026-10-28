@@ -7,25 +7,23 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
-import PrinterSettings from '../components/PrinterSettings.vue'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
-// Pengaturan aplikasi hanya pemilik; tab Printer (per perangkat) untuk semua pengguna.
-const canManage = auth.can('settings.manage')
+// Tab tampil sesuai hak akses settings.<tab> (lihat appTabs). Printer struk diatur per perangkat di halaman Printer.
+const allowed = (key) => auth.can(`settings.${key}`)
 const form = ref(null)
 const serverPreview = ref({})
 const errors = ref({})
 const saving = ref(false)
-// ?tab=printer dari pemberitahuan printer di halaman kasir.
-const tab = ref(canManage && useRoute().query.tab !== 'printer' ? 'app' : 'printer')
+const requestedTab = useRoute().query.tab
 
 // Catatan kaki struk diatur per baris (disimpan sebagai teks dipisah baris baru).
 const FOOTER_LINES = 6
 const FOOTER_WIDTH = 32
 const footer = ref([])
-watch(footer, (lines) => form.value && (form.value.receipt_footer = lines.join('\n')), { deep: true })
+watch(footer, (lines) => form.value && 'receipt_footer' in form.value && (form.value.receipt_footer = lines.join('\n')), { deep: true })
 const footerPreview = computed(() => {
   const lines = footer.value.map((line) => line.trim()).filter(Boolean)
   return ['-'.repeat(FOOTER_WIDTH), ...lines.map((line) => center(line)), ...(form.value?.receipt_qr ? ['', center('[QR]'), center('Scan untuk struk digital')] : [])].join('\n')
@@ -93,8 +91,8 @@ const appTabs = [
   { key: 'security', label: 'Keamanan & Email', icon: 'shield' },
   { key: 'maintenance', label: 'Pemeliharaan', icon: 'archive' },
 ]
-const printerTab = { key: 'printer', label: 'Printer (perangkat ini)', icon: 'printer' }
-const tabs = canManage ? [...appTabs, printerTab] : [printerTab]
+const tabs = appTabs.filter((item) => allowed(item.key))
+const tab = ref(tabs.some((item) => item.key === requestedTab) ? requestedTab : tabs[0]?.key)
 
 const documents = [
   { key: 'prefix_sale', type: 'sale', label: 'Nota penjualan (kasir)' },
@@ -173,7 +171,7 @@ async function cleanup() {
     cleaning.value = false
   }
 }
-watch(tab, (value) => value === 'maintenance' && canManage && loadMaintenance())
+watch(tab, (value) => value === 'maintenance' && allowed('maintenance') && loadMaintenance(), { immediate: true })
 
 // Keamanan: konfigurasi email & login Google dari .env (hanya ditampilkan) + email uji.
 const system = ref(null)
@@ -203,7 +201,7 @@ async function save() {
     form.value = data.data
     system.value = data.system
     addressSplit.value = false
-    setFooter(data.data.receipt_footer)
+    if (allowed('store')) setFooter(data.data.receipt_footer)
     serverPreview.value = data.preview
     meta.load(true)
     toast.success('Pengaturan disimpan.')
@@ -217,27 +215,28 @@ async function save() {
 }
 
 onMounted(async () => {
-  if (!canManage) return
   const { data } = await http.get('/settings')
   form.value = data.data
   system.value = data.system
-  splitAddress(form.value)
-  setFooter(data.data.receipt_footer)
-  if (!footer.value.length) footer.value.push('')
+  if (allowed('store')) {
+    splitAddress(form.value)
+    setFooter(data.data.receipt_footer)
+    if (!footer.value.length) footer.value.push('')
+  }
   serverPreview.value = data.preview
-  http.get('/cash/accounts').then(({ data }) => (banks.value = data.data.filter((account) => account.type === 'bank'))).catch(() => {})
+  if (allowed('closing')) http.get('/cash/accounts').then(({ data }) => (banks.value = data.data.filter((account) => account.type === 'bank'))).catch(() => {})
 })
 </script>
 
 <template>
   <div class="stagger">
-    <PageHeader :title="canManage ? 'Pengaturan Aplikasi' : 'Pengaturan'" :subtitle="canManage ? 'Pengaturan aplikasi hanya oleh Pemilik; printer diatur per perangkat' : 'Printer struk di perangkat ini'">
-      <template v-if="canManage && tab !== 'printer'" #actions>
+    <PageHeader title="Pengaturan Aplikasi" subtitle="Tab sesuai hak akses Anda">
+      <template #actions>
         <button class="btn-primary" :disabled="saving || !form" @click="save"><AppIcon name="check" :size="16" /> {{ saving ? 'Menyimpan…' : 'Simpan Pengaturan' }}</button>
       </template>
     </PageHeader>
 
-    <div v-if="form || !canManage" class="grid gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
+    <div v-if="form" class="grid gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
       <!-- Navigasi tab -->
       <nav class="flex gap-1 overflow-x-auto rounded-xl bg-slate-200/60 p-1 lg:flex-col lg:self-start lg:bg-transparent lg:p-0">
         <button
@@ -254,10 +253,7 @@ onMounted(async () => {
         </button>
       </nav>
 
-      <Transition v-if="tab === 'printer'" name="page" appear>
-        <PrinterSettings />
-      </Transition>
-      <form v-else @submit.prevent="save">
+      <form @submit.prevent="save">
         <Transition name="page" mode="out-in">
           <!-- Aplikasi -->
           <section v-if="tab === 'app'" key="app" class="card space-y-4 p-5">
@@ -578,7 +574,7 @@ onMounted(async () => {
                   <dd class="font-medium" :class="system.google_enabled ? 'text-emerald-700' : 'text-slate-500'">{{ system.google_enabled ? 'Aktif' : 'Tidak aktif (GOOGLE_CLIENT_ID kosong)' }}</dd>
                 </div>
               </dl>
-              <p class="text-xs text-slate-500">Verifikasi 2 langkah (MFA) dan tautan akun Google diatur masing-masing pengguna di menu Akun Saya.</p>
+              <p class="text-xs text-slate-500">Verifikasi 2 langkah (MFA) dan tautan akun Google diatur masing-masing pengguna di menu Profil Saya.</p>
             </div>
           </section>
 

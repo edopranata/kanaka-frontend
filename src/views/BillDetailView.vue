@@ -12,7 +12,9 @@ import AppModal from '../components/AppModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const meta = useMetaStore()
@@ -85,8 +87,8 @@ onMounted(load)
     <PageHeader :title="bill?.number || 'Detail Tagihan'" :subtitle="bill ? `${bill.customer.name} · ${periodLabel(bill.period)}` : ''" :back="{ name: 'bills' }" class="no-print">
       <template v-if="bill" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak Tagihan</button>
-        <button v-if="bill.paid === 0" class="btn-secondary text-red-600" @click="cancelBill"><AppIcon name="ban" :size="16" /> Batalkan</button>
-        <button v-if="bill.remaining > 0" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Catat Pembayaran</button>
+        <button v-if="bill.paid === 0 && auth.can('bills.delete')" class="btn-secondary text-red-600" @click="cancelBill"><AppIcon name="ban" :size="16" /> Batalkan</button>
+        <button v-if="bill.remaining > 0 && auth.can('bills.pay')" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Catat Pembayaran</button>
       </template>
     </PageHeader>
 
@@ -160,7 +162,7 @@ onMounted(load)
                 <td>{{ payment.user }}</td>
                 <td class="num font-medium">{{ rupiah(payment.amount, false) }}</td>
                 <td class="no-print text-right">
-                  <button class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Batalkan pembayaran" @click="cancelPayment(payment)"><AppIcon name="trash" :size="16" /></button>
+                  <button v-if="auth.can('bills.cancel_payment')" class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Batalkan pembayaran" @click="cancelPayment(payment)"><AppIcon name="trash" :size="16" /></button>
                 </td>
               </tr>
               <tr v-if="!bill.payments.length"><td colspan="6" class="py-6 text-center text-slate-500">Belum ada pembayaran.</td></tr>

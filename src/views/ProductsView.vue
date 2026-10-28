@@ -19,7 +19,18 @@ const auth = useAuthStore()
 const toast = useToastStore()
 const meta = useMetaStore()
 const route = useRoute()
-const canManage = auth.can('products.manage')
+// Hak akses per aksi; harga jual produk yang sudah ada hanya bisa diubah dengan products.price, HPP hanya profit.view.
+const can = {
+  create: auth.can('products.create'),
+  update: auth.can('products.update'),
+  delete: auth.can('products.delete'),
+  price: auth.can('products.price'),
+  import: auth.can('products.import'),
+  categories: auth.can('categories.manage'),
+  cost: auth.can('profit.view'),
+}
+/** Harga & satuan jual dikunci saat mengubah produk tanpa hak "Ubah harga jual". */
+const priceLocked = (form) => Boolean(form?.id) && !can.price
 
 // Status default: hanya produk aktif (tampil di kasir). '' = semua status.
 const filters = reactive({ search: '', category_id: '', low_stock: route.query.low_stock === '1' ? 1 : 0, sellable: '', active: route.query.active ?? '1' })
@@ -114,6 +125,7 @@ async function save() {
       .map((unit) => ({ ...unit, name: unit.conversion === 1 ? form.value.unit : unit.name, barcode: unit.conversion === 1 ? null : unit.barcode || null })),
   }
   if (payload.id && !canSetInitialStock(form.value)) delete payload.initial_stock
+  if (!can.cost) delete payload.cost_price
   try {
     if (payload.id) {
       await http.put(`/products/${payload.id}`, payload)
@@ -210,10 +222,10 @@ onMounted(() => {
 <template>
   <div class="stagger">
     <PageHeader title="Produk" subtitle="Master barang, harga, dan stok">
-      <template v-if="canManage" #actions>
-        <button class="btn-secondary" @click="(importModal = true), (importResult = null)"><AppIcon name="upload" :size="16" /> Import Excel</button>
-        <button class="btn-secondary" @click="categoryModal = true"><AppIcon name="tag" :size="16" /> Kategori</button>
-        <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Produk Baru</button>
+      <template v-if="can.import || can.categories || can.create" #actions>
+        <button v-if="can.import" class="btn-secondary" @click="(importModal = true), (importResult = null)"><AppIcon name="upload" :size="16" /> Import Excel</button>
+        <button v-if="can.categories" class="btn-secondary" @click="categoryModal = true"><AppIcon name="tag" :size="16" /> Kategori</button>
+        <button v-if="can.create" class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Produk Baru</button>
       </template>
     </PageHeader>
 
@@ -249,7 +261,7 @@ onMounted(() => {
             <tr>
               <th>Produk</th>
               <th>Kategori</th>
-              <th v-if="canManage" class="num">Harga Beli (HPP)</th>
+              <th v-if="can.cost" class="num">Harga Beli (HPP)</th>
               <th class="num">Harga Jual / Satuan</th>
               <th class="num">Stok</th>
               <th>Status</th>
@@ -266,7 +278,7 @@ onMounted(() => {
                 <p v-if="product.consignor" class="mt-0.5 text-xs text-sky-700">Titipan: {{ product.consignor.name }}</p>
               </td>
               <td class="stack-hide">{{ product.category || '-' }}</td>
-              <td v-if="canManage" class="num">{{ rupiah(product.cost_price, false) }}</td>
+              <td v-if="can.cost" class="num">{{ rupiah(product.cost_price, false) }}</td>
               <td class="num">
                 <span v-if="!product.has_price" class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-600/20 ring-inset">Belum ada harga</span>
                 <template v-else>
@@ -293,10 +305,8 @@ onMounted(() => {
                   <RouterLink v-if="auth.can('stock.view')" :to="{ name: 'stock-card', params: { id: product.id } }" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Kartu stok">
                     <AppIcon name="clipboard" :size="16" />
                   </RouterLink>
-                  <template v-if="canManage">
-                    <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(product)"><AppIcon name="pencil" :size="16" /></button>
-                    <button class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(product)"><AppIcon name="trash" :size="16" /></button>
-                  </template>
+                  <button v-if="can.update" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(product)"><AppIcon name="pencil" :size="16" /></button>
+                  <button v-if="can.delete" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(product)"><AppIcon name="trash" :size="16" /></button>
                 </div>
               </td>
             </tr>
@@ -354,7 +364,7 @@ onMounted(() => {
           <input v-model="form.unit" class="input uppercase" list="unit-names" required @input="form.unit = form.unit.toUpperCase()" />
           <p class="mt-1 text-xs text-slate-500">Stok & HPP dihitung dalam satuan ini.</p>
         </div>
-        <div>
+        <div v-if="can.cost">
           <label class="label">HPP per {{ form.unit || 'satuan' }}</label>
           <MoneyInput v-model="form.cost_price" :invalid="!!errors.cost_price" />
           <p class="mt-1 text-xs text-slate-500">Diperbarui otomatis (rata-rata) setiap ada pembelian.</p>
@@ -368,7 +378,8 @@ onMounted(() => {
               <p class="text-sm font-semibold text-slate-800">Satuan & harga jual</p>
               <p class="text-xs text-slate-500">Harga tiap satuan bebas diatur, mis. 1 BOX isi 6 bisa lebih murah dari 6 × harga {{ form.unit || 'PCS' }}.</p>
             </div>
-            <button type="button" class="btn-secondary btn-sm" @click="addUnit"><AppIcon name="plus" :size="14" /> Satuan</button>
+            <button v-if="!priceLocked(form)" type="button" class="btn-secondary btn-sm" @click="addUnit"><AppIcon name="plus" :size="14" /> Satuan</button>
+            <span v-else class="flex shrink-0 items-center gap-1 text-xs text-slate-500" title="Butuh hak akses Ubah harga jual"><AppIcon name="lock" :size="14" /> Harga dikunci</span>
           </div>
           <div class="divide-y divide-slate-100">
             <div v-for="(unit, index) in form.units" :key="index" class="grid grid-cols-2 gap-2 px-4 py-3 sm:grid-cols-[1fr_5rem_1.3fr_1.3fr_auto] sm:items-start">
@@ -380,7 +391,7 @@ onMounted(() => {
               </div>
               <div>
                 <label class="text-xs text-slate-500">Isi</label>
-                <input v-model.number="unit.conversion" type="number" min="2" class="input" :disabled="unit.conversion === 1 && unit === baseUnit(form)" />
+                <input v-model.number="unit.conversion" type="number" min="2" class="input" :disabled="(unit.conversion === 1 && unit === baseUnit(form)) || priceLocked(form)" />
                 <p v-if="unitError(form.units.indexOf(unit), 'conversion')" class="error-text">{{ unitError(form.units.indexOf(unit), 'conversion') }}</p>
               </div>
               <div>
@@ -391,17 +402,19 @@ onMounted(() => {
               </div>
               <div>
                 <label class="text-xs text-slate-500">Harga jual</label>
-                <MoneyInput v-model="unit.sell_price" />
+                <MoneyInput v-model="unit.sell_price" :disabled="priceLocked(form)" />
                 <p class="mt-1 text-xs text-slate-500">
                   <template v-if="unit === baseUnit(form)">
-                    <span v-if="margin(form) !== null" :class="{ 'text-red-600': margin(form) < 0 }">Margin {{ margin(form) }}%</span>
+                    <template v-if="baseUnit(form)?.sell_price > 0">
+                      <span v-if="can.cost && margin(form) !== null" :class="{ 'text-red-600': margin(form) < 0 }">Margin {{ margin(form) }}%</span>
+                    </template>
                     <span v-else class="text-amber-600">Isi harga agar bisa dijual</span>
                   </template>
                   <template v-else>{{ unitInfo(form, unit) }}</template>
                 </p>
               </div>
               <div class="flex items-end justify-end sm:pt-5">
-                <button v-if="unit !== baseUnit(form)" type="button" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus satuan" @click="removeUnit(unit)">
+                <button v-if="unit !== baseUnit(form) && !priceLocked(form)" type="button" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus satuan" @click="removeUnit(unit)">
                   <AppIcon name="trash" :size="16" />
                 </button>
               </div>

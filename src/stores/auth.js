@@ -23,7 +23,7 @@ export const useAuthStore = defineStore('auth', {
     /** Halaman pertama setelah login (diatur per role: Dashboard / Kasir). */
     homePath() {
       if (this.user?.home === 'pos' && this.can('pos')) return '/kasir'
-      return this.can('dashboard') ? '/' : '/akun'
+      return this.can('dashboard') ? '/' : '/profil'
     },
     /**
      * Masuk dengan nama pengguna & kata sandi. Hasil: 'ok' atau 'two_factor' (lanjut ke verifyTwoFactor).

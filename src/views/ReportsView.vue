@@ -9,7 +9,9 @@ import AppIcon from '../components/AppIcon.vue'
 import DateRange from '../components/DateRange.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ReportTable from '../components/ReportTable.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
 
@@ -90,8 +92,8 @@ onMounted(async () => {
     <PageHeader title="Laporan" subtitle="Pilih jenis laporan, atur periode, lalu cetak atau export ke PDF / Excel" class="no-print">
       <template #actions>
         <button class="btn-secondary" :disabled="!report" @click="print"><AppIcon name="printer" :size="16" /> Cetak</button>
-        <button class="btn-secondary" :disabled="!report || loading || exportingPdf" :title="`Kertas ${pdfPaper} (Pengaturan → Aplikasi)`" @click="exportPdf"><AppIcon name="document" :size="16" /> {{ exportingPdf ? 'Membuat PDF…' : 'Export PDF' }}</button>
-        <button class="btn-primary" :disabled="!report || exporting" @click="exportExcel"><AppIcon name="download" :size="16" /> {{ exporting ? 'Mengunduh…' : 'Export Excel' }}</button>
+        <button v-if="auth.can('reports.export')" class="btn-secondary" :disabled="!report || loading || exportingPdf" :title="`Kertas ${pdfPaper} (Pengaturan → Aplikasi)`" @click="exportPdf"><AppIcon name="document" :size="16" /> {{ exportingPdf ? 'Membuat PDF…' : 'Export PDF' }}</button>
+        <button v-if="auth.can('reports.export')" class="btn-primary" :disabled="!report || exporting" @click="exportExcel"><AppIcon name="download" :size="16" /> {{ exporting ? 'Mengunduh…' : 'Export Excel' }}</button>
       </template>
     </PageHeader>
 

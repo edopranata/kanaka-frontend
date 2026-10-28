@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
+import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { rupiah } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
@@ -17,7 +18,14 @@ const props = defineProps({
   type: { type: String, required: true }, // suppliers | customers
 })
 
+const auth = useAuthStore()
 const toast = useToastStore()
+// Hak akses per aksi: suppliers.* / customers.*
+const can = computed(() => ({
+  create: auth.can(`${props.type}.create`),
+  update: auth.can(`${props.type}.update`),
+  delete: auth.can(`${props.type}.delete`),
+}))
 const label = computed(() => (props.type === 'suppliers' ? 'Supplier' : 'Pelanggan'))
 
 const search = ref('')
@@ -83,7 +91,7 @@ onMounted(() => load())
 <template>
   <div class="stagger">
     <PageHeader :title="label" :subtitle="type === 'suppliers' ? 'Pemasok barang untuk pembelian' : 'Data pelanggan untuk transaksi kasir'">
-      <template #actions>
+      <template v-if="can.create" #actions>
         <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> {{ label }} Baru</button>
       </template>
     </PageHeader>
@@ -106,8 +114,8 @@ onMounted(() => load())
               <td v-if="type === 'customers'" class="num">{{ contact.credit_limit ? rupiah(contact.credit_limit, false) : 'Tanpa batas' }}</td>
               <td class="max-w-64 truncate text-slate-500">{{ contact.notes || '' }}</td>
               <td class="text-right">
-                <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(contact)"><AppIcon name="pencil" :size="16" /></button>
-                <button class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(contact)"><AppIcon name="trash" :size="16" /></button>
+                <button v-if="can.update" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(contact)"><AppIcon name="pencil" :size="16" /></button>
+                <button v-if="can.delete" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(contact)"><AppIcon name="trash" :size="16" /></button>
               </td>
             </tr>
           </tbody>

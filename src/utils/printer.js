@@ -19,11 +19,14 @@ const BLE_SERVICES = [
   'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
 ]
 
+// deviceName: nama perangkat ini (mis. "Kasir Depan") agar mudah dikenali bila ada beberapa PC / HP kasir.
+const DEFAULTS = { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, qrSize: 'sedang', deviceId: '', deviceName: '', hideBrowserNotice: false }
+
 function load() {
   try {
-    return { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, qrSize: 'sedang', deviceId: '', hideBrowserNotice: false, ...JSON.parse(localStorage.getItem(KEY) || '{}') }
+    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }
   } catch {
-    return { mode: 'browser', paper: '', autoPrint: false, feed: 3, cut: true, qrSize: 'sedang', deviceId: '', hideBrowserNotice: false }
+    return { ...DEFAULTS }
   }
 }
 
@@ -39,7 +42,7 @@ watch(printerConfig, (value) => {
 // status: '' (belum dicek) | checking | ready | unpaired (belum dipilih) | offline (tidak merespons / terputus)
 export const printerState = reactive({ connected: false, connecting: false, name: '', lastError: '', status: '', log: [] })
 
-/** Catatan diagnostik singkat (tampil di Pengaturan → Printer). */
+/** Catatan diagnostik singkat (tampil di halaman Printer Struk). */
 function log(message) {
   const time = new Date().toLocaleTimeString('id-ID')
   printerState.log.unshift(`${time}  ${message}`)
@@ -269,7 +272,7 @@ export async function sendBytes(bytes) {
   printerState.lastError = ''
   try {
     if (!(await reconnect())) {
-      throw new Error('Printer belum dipilih. Buka Pengaturan → Printer lalu klik "Hubungkan printer".')
+      throw new Error('Printer belum dipilih. Buka menu pengguna → Printer struk, lalu klik "Hubungkan printer".')
     }
 
     if (port) {
@@ -337,7 +340,7 @@ export const printerNotice = computed(() => {
     case 'checking':
       return { level: 'info', key: 'checking', title: 'Memeriksa printer…', detail: 'Menyambungkan ke printer.' }
     case 'unpaired':
-      return { level: 'warn', key: 'unpaired', title: 'Printer belum dipilih di perangkat ini', detail: 'Buka Pengaturan → Printer lalu klik "Hubungkan printer".' }
+      return { level: 'warn', key: 'unpaired', title: 'Printer belum dipilih di perangkat ini', detail: 'Buka menu pengguna → Printer struk, lalu klik "Hubungkan printer".' }
     case 'offline':
       return { level: 'error', key: 'offline', title: 'Printer tidak terhubung', detail: `${printerState.lastError || 'Printer tidak merespons.'} Pastikan printer menyala & Bluetooth tersambung, lalu klik Cek lagi.` }
     default:

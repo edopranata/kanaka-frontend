@@ -40,7 +40,7 @@ kanaka/
 
 ## Printer struk (thermal / Bluetooth)
 
-Diatur **per perangkat** di **Pengaturan → Printer (perangkat ini)** — bisa dibuka semua pengguna, termasuk kasir.
+Diatur **per perangkat** di halaman **Printer Struk** (`/printer`, dari menu pengguna di bawah sidebar → *Printer struk*) — bisa dibuka semua pengguna, termasuk kasir. Pengaturan tersimpan di browser, sehingga berlaku untuk semua pengguna di perangkat/browser itu; beri **nama perangkat** (mis. *Kasir Depan*) agar mudah dikenali.
 
 | Cara mencetak | Untuk | Keterangan |
 | --- | --- | --- |
@@ -78,9 +78,9 @@ Windows (contoh Rongta RPP02N): nyalakan printer → **Settings → Bluetooth & 
   - Setelah menambah kata kunci, kategorikan ulang isi "Lain-lain": `php artisan products:categorize --fallback`
   - Kategorikan ulang semua barang: `php artisan products:categorize --all`
 
-## Pengaturan aplikasi (khusus Pemilik)
+## Pengaturan aplikasi
 
-Menu *Pengaturan Aplikasi*: nama & slogan aplikasi (tampil di halaman masuk), identitas toko & struk (kertas 58/80 mm),
+Menu *Pengaturan Aplikasi* (setiap tab diatur hak aksesnya sendiri, lihat bagian Role & hak akses): nama & slogan aplikasi (tampil di halaman masuk), identitas toko & struk (kertas 58/80 mm),
 prefix setiap dokumen (nota `INV`, bon `BON`, pembelian `PB`, penyesuaian `ADJ`, opname `SO`, tagihan `TG`), periode
 pengulangan nomor urut (harian/bulanan/tahunan) & jumlah digit, prefix SKU, pajak, rekening default per metode non tunai, satuan & stok minimum
 bawaan, stok minus, closing otomatis, serta tagihan otomatis & jatuh tempo.
@@ -208,32 +208,41 @@ Pemilik dan transaksi yang belum di-closing dibukukan ke akun masing-masing. Sal
 Konsep: **Pengguna → 1 Role → banyak hak akses (permission)**. Role dibuat di menu **Administrasi → Role & Hak Akses**
 sesuai jabatan (mis. Supervisor Kasir, Keuangan, Kepala Gudang), lalu diberikan ke pengguna di menu **Pengguna**.
 
-Role bawaan (hasil migrasi dari level lama, hak aksesnya sama persis):
+Hak akses dirinci per modul dengan pola `modul.aksi` dan diatur lewat **matriks** (baris = modul, kolom = Lihat /
+Tambah / Ubah / Hapus / Lainnya). Klik nama modul atau judul kolom untuk mencentang sekaligus, atau salin dari role lain.
 
-| Role | Hak akses awal |
+| Kelompok | Contoh hak akses |
 | --- | --- |
-| **Pemilik** 🔒 | Role sistem: **selalu semua hak akses**, termasuk hak akses baru di masa depan. Tidak bisa diubah/dihapus. |
-| **Admin / Manajer** | Semua data, laporan (termasuk laba), diskon & promo, kas & rekening semua pengguna, void transaksi, closing, tagihan & piutang, kelola pengguna. Tanpa: pengaturan aplikasi, batal closing, kelola role. |
-| **Staf Gudang** | Produk, supplier, pembelian, barang titipan, penyesuaian/opname, kartu stok, laporan stok & pembelian. |
-| **Kasir** | POS, bon, pelanggan, riwayat transaksi **miliknya sendiri**, kas fisik sendiri, closing manual. Halaman awal: Kasir. |
+| Penjualan | Kasir (POS), bon, lihat semua penjualan, void; diskon & pelanggan (lihat / tambah / ubah / hapus) |
+| Inventory | Produk (lihat / tambah / ubah / hapus, **ubah harga jual**, import Excel), kategori, paket, supplier, pembelian (lihat sendiri / semua, catat, void), stok (kartu stok, penyesuaian, **opname** terpisah), barang titipan (terima, batalkan, penyelesaian, bayar) |
+| Keuangan | Kas (lihat semua, kelola rekening, penyesuaian saldo), pengeluaran (lihat sendiri / semua, catat, ubah, hapus), tagihan (lihat, buat, hapus, terima & batalkan pembayaran), closing (lihat, closing, batalkan) |
+| Laporan | **Per jenis laporan** (12 laporan), **Export Excel / PDF** terpisah, **Lihat HPP & laba** (harga modal & laba di semua halaman) |
+| Administrasi | Pengguna (lihat / tambah / ubah / hapus, keamanan akun), role & hak akses, log aktivitas |
+| Pengaturan | **Per tab**: Aplikasi, Toko & Struk, Penomoran, Transaksi & Stok, Closing/Kas/Tagihan, Keamanan & Email, Pemeliharaan. Menu *Pengaturan* hanya tampil bagi yang punya minimal satu tab; printer struk ada di halaman terpisah untuk semua pengguna |
 
-Role bawaan selain Pemilik bisa diubah seperti role lain. Setiap role punya **halaman awal** setelah login
-(Dashboard atau Kasir). Form role mengelompokkan hak akses per modul, bisa **menyalin** dari role lain, dan otomatis
-mencentang hak akses yang dibutuhkan (mis. *Kasir (POS)* → *Lihat produk*).
+Aturan penting:
 
-Aturan keamanan:
+- **Milik sendiri vs semua**: penjualan, pembelian, penyesuaian stok, pengeluaran, dan kas hanya menampilkan data yang
+  dicatat pengguna itu sendiri, kecuali role-nya diberi hak *Lihat semua* modul tersebut.
+- **Harga jual dikunci** saat mengubah produk / paket tanpa hak *Ubah harga jual* (data lain tetap bisa diubah).
+  Harga modal (HPP) hanya terlihat & bisa diubah dengan *Lihat HPP & laba*.
+- Hak akses yang dibutuhkan ikut tercentang otomatis (mis. *Ubah produk* → *Lihat produk*; *Catat pembelian* →
+  *Lihat supplier*).
+- **Pemilik** 🔒 adalah role sistem: selalu memiliki semua hak akses, termasuk yang ditambahkan kemudian.
+- Pengguna dengan hak kelola pengguna / role hanya bisa memberi role & hak akses yang **tidak melebihi miliknya**;
+  role Pemilik hanya oleh Pemilik. Tidak bisa mengubah role / menonaktifkan akun sendiri; selalu tersisa minimal satu
+  Pemilik aktif; role yang masih dipakai tidak bisa dihapus.
+- Perubahan hak akses **langsung berlaku** (tanpa login ulang) dan tercatat di Log Aktivitas.
 
-- Mengelola role butuh hak akses **Kelola role & hak akses** (`roles.manage`), awalnya hanya Pemilik.
-- Pengguna dengan *Kelola pengguna* hanya bisa memberi / mengubah akun dengan role yang hak aksesnya **tidak melebihi
-  miliknya**; role Pemilik hanya oleh Pemilik. Pengelola role non-pemilik tidak bisa memberi hak akses yang tidak ia
-  miliki dan tidak bisa mengubah role miliknya sendiri.
-- Tidak bisa mengubah role / menonaktifkan akun sendiri; selalu tersisa minimal satu Pemilik aktif; role yang masih
-  dipakai tidak bisa dihapus.
-- Perubahan hak akses **langsung berlaku** di server (tanpa login ulang); semua perubahan role tercatat di Log Aktivitas.
+Role bawaan: **Admin / Manajer** (semua kecuali pengaturan aplikasi, batal closing, kelola role), **Staf Gudang**
+(produk, supplier, pembelian, titipan, stok, laporan stok & pembelian), **Kasir** (POS, bon, pelanggan, transaksi &
+kas sendiri, closing manual). Saat pembaruan hak akses yang lebih rinci dipasang, hak akses lama setiap role diubah
+otomatis ke hak akses baru yang **setara** (migrasi `refine_role_permissions`), jadi akses tidak berubah sampai diatur ulang.
 
-Untuk developer: daftar hak akses (kode, label, grup, ketergantungan) ada di `backend/app/Enums/Permission.php`
-(`catalog()`); route memakai middleware `permission:a,b`, frontend memakai `auth.can('a')`. Menambah fitur baru =
-tambah konstanta + entri katalog, lalu cek di route/frontend; Pemilik otomatis mendapatkannya.
+Untuk developer: katalog hak akses (kode, grup, modul, aksi, label, ketergantungan) ada di
+`backend/app/Enums/Permission.php`; pengaturan per tab di `backend/app/Support/SettingTabs.php`. Route memakai
+middleware `permission:a,b` (cukup salah satu), frontend memakai `auth.can('a')`. Menambah fitur = tambah konstanta +
+entri katalog, lalu cek di route / frontend; Pemilik otomatis mendapatkannya.
 
 ## Akun pengguna, email & keamanan login
 
@@ -245,10 +254,10 @@ tambah konstanta + entri katalog, lalu cek di route/frontend; Pemilik otomatis m
   pengguna itu keluar. Dari form yang sama, pengelola bisa **menonaktifkan 2FA** pengguna yang kehilangan HP.
 - **Lupa kata sandi?** di halaman masuk: isi nama pengguna atau email. Tautan atur ulang dikirim ke email akun,
   berlaku 60 menit dan hanya sekali pakai. Pesannya selalu sama, jadi tidak membocorkan akun mana yang terdaftar.
-- **Masuk dengan Google** (opsional): pengguna menautkan akun Google di **Akun Saya**, lalu bisa memakai tombol
+- **Masuk dengan Google** (opsional): pengguna menautkan akun Google di **Profil Saya**, lalu bisa memakai tombol
   Google di halaman masuk. Akun Google yang belum ditautkan ditolak. Tombolnya hanya tampil bila `GOOGLE_CLIENT_ID`
   diisi.
-- **Verifikasi 2 langkah / MFA** (opsional, per pengguna di **Akun Saya**): pindai QR dengan Google Authenticator,
+- **Verifikasi 2 langkah / MFA** (opsional, per pengguna di **Profil Saya**): pindai QR dengan Google Authenticator,
   Microsoft Authenticator, Authy, dll. Setelah itu login (kata sandi maupun Google) meminta 6 digit kode. Saat
   aktivasi, aplikasi memberi 8 **kode pemulihan** sekali pakai untuk keadaan HP hilang.
 
@@ -338,7 +347,7 @@ Test backend: `cd backend && php artisan test`
 > branch `dev` = pengembangan (push → dites / cek build saja, tanpa deploy). Rilis dengan merge `dev` → `main`.
 
 1. **Backend**: deploy Laravel seperti biasa (MySQL: ubah `DB_*` di `.env`, pastikan `APP_TIMEZONE=Asia/Jakarta`),
-   jalankan `php artisan migrate --force --seed`, lalu segera ganti kata sandi `owner` di menu Akun Saya.
+   jalankan `php artisan migrate --force --seed`, lalu segera ganti kata sandi `owner` di menu Profil Saya.
 2. **Cron (wajib untuk closing otomatis, tagihan bulanan & pemeliharaan)**, setiap menit:
    ```
    * * * * * /bin/bash /path/ke/backend/scripts/cron-schedule.sh

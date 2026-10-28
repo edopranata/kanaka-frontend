@@ -118,7 +118,7 @@ function addToCart(product, unitId = null, qty = 1) {
   const units = (product.units || []).filter((unit) => unit.sell_price > 0)
   const unit = units.find((item) => item.id === unitId) || units.find((item) => item.conversion === 1) || units[0]
   if (!unit) {
-    toast.error(`${product.name} belum punya harga jual.${auth.can('products.manage') ? ' Atur harganya di menu Produk.' : ''}`)
+    toast.error(`${product.name} belum punya harga jual.${auth.can('products.price') ? ' Atur harganya di menu Produk.' : ''}`)
     return
   }
 
@@ -222,7 +222,7 @@ const total = computed(() => Math.max(0, subtotal.value + tax.value))
 const itemCount = computed(() => cart.items.reduce((sum, line) => sum + (Number(line.qty) || 0), 0))
 
 // ---- Pelanggan (bisa dicari; kosong = pelanggan umum) ----
-const canPickCustomer = auth.can('customers.manage', 'credit.sell', 'receivables.manage')
+const canPickCustomer = auth.can('customers.view')
 
 // ---- Kategori: beberapa terpopuler tampil sebagai tombol, sisanya lewat dialog ----
 const TOP_CATEGORIES = 5

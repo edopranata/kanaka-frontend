@@ -11,7 +11,9 @@ import AppModal from '../components/AppModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const meta = useMetaStore()
@@ -83,8 +85,8 @@ onMounted(load)
     <PageHeader :title="settlement?.number || 'Penyelesaian Titipan'" :subtitle="settlement ? `${settlement.supplier.name} · ${tanggal(settlement.date, 'long')}` : ''" :back="{ name: 'consignments', query: { tab: 'settlements' } }" class="no-print">
       <template v-if="settlement" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak</button>
-        <button v-if="settlement.paid === 0" class="btn-secondary text-red-600" @click="cancelSettlement"><AppIcon name="ban" :size="16" /> Batalkan</button>
-        <button v-if="settlement.remaining > 0" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Bayar</button>
+        <button v-if="settlement.paid === 0 && auth.can('consignments.settle')" class="btn-secondary text-red-600" @click="cancelSettlement"><AppIcon name="ban" :size="16" /> Batalkan</button>
+        <button v-if="settlement.remaining > 0 && auth.can('consignments.pay')" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Bayar</button>
       </template>
     </PageHeader>
 
@@ -141,7 +143,7 @@ onMounted(load)
                 <td>{{ payment.user }}</td>
                 <td class="num font-medium">{{ rupiah(payment.amount, false) }}</td>
                 <td class="no-print text-right">
-                  <button class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Batalkan pembayaran" @click="cancelPayment(payment)"><AppIcon name="trash" :size="16" /></button>
+                  <button v-if="auth.can('consignments.pay')" class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Batalkan pembayaran" @click="cancelPayment(payment)"><AppIcon name="trash" :size="16" /></button>
                 </td>
               </tr>
               <tr v-if="!settlement.payments.length"><td colspan="6" class="py-6 text-center text-slate-500">Belum dibayar.</td></tr>

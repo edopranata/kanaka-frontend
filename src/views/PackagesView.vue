@@ -16,7 +16,15 @@ import StatusBadge from '../components/StatusBadge.vue'
 const auth = useAuthStore()
 const toast = useToastStore()
 const meta = useMetaStore()
-const canManage = auth.can('products.manage')
+// Paket memakai hak akses paket; hapus = hapus produk; harga jual paket yang sudah ada butuh products.price.
+const can = {
+  create: auth.can('packages.create'),
+  update: auth.can('packages.update'),
+  delete: auth.can('products.delete'),
+  price: auth.can('products.price'),
+  cost: auth.can('profit.view'),
+}
+const priceLocked = computed(() => Boolean(form.value?.id) && !can.price)
 
 const packages = ref([])
 const categories = ref([])
@@ -98,7 +106,7 @@ function addComponent(product) {
     qty: 1,
     // Bahan pertama otomatis jadi bahan utama.
     is_optional: form.value.components.length > 0,
-    omit_price: form.value.components.length > 0 ? product.sell_price || 0 : 0,
+    omit_price: form.value.components.length > 0 && !priceLocked.value ? product.sell_price || 0 : 0,
   })
 }
 
@@ -151,7 +159,7 @@ onMounted(() => {
 <template>
   <div class="stagger">
     <PageHeader title="Paket / Menu Olahan" subtitle="Produk racikan dari beberapa bahan, mis. Indomie + Telur dimasak. Stok diambil dari bahan-bahannya.">
-      <template v-if="canManage" #actions>
+      <template v-if="can.create" #actions>
         <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Paket Baru</button>
       </template>
     </PageHeader>
@@ -191,7 +199,7 @@ onMounted(() => {
         <dl class="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs">
           <div><dt class="text-slate-500">Nilai bahan</dt><dd class="font-semibold tabular-nums">{{ rupiah(calc(pkg).materialValue) }}</dd></div>
           <div><dt class="text-slate-500">Jasa / olahan</dt><dd class="font-semibold tabular-nums">{{ rupiah(calc(pkg).service) }}</dd></div>
-          <template v-if="canManage">
+          <template v-if="can.cost">
             <div><dt class="text-slate-500">HPP bahan</dt><dd class="font-semibold tabular-nums">{{ rupiah(calc(pkg).cost) }}</dd></div>
             <div><dt class="text-slate-500">Laba kotor</dt><dd class="font-semibold text-emerald-700 tabular-nums">{{ rupiah(calc(pkg).profit) }} ({{ calc(pkg).margin.toFixed(0) }}%)</dd></div>
           </template>
@@ -203,17 +211,15 @@ onMounted(() => {
           </span>
           <span class="flex items-center gap-1">
             <StatusBadge v-if="!pkg.is_active" status="nonaktif" />
-            <template v-if="canManage">
-              <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(pkg)"><AppIcon name="pencil" :size="16" /></button>
-              <button class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(pkg)"><AppIcon name="trash" :size="16" /></button>
-            </template>
+            <button v-if="can.update" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(pkg)"><AppIcon name="pencil" :size="16" /></button>
+            <button v-if="can.delete" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(pkg)"><AppIcon name="trash" :size="16" /></button>
           </span>
         </footer>
       </article>
     </div>
     <div v-else-if="!loading" class="card">
       <EmptyState icon="fire" title="Belum ada paket" text="Buat paket seperti “Indomie Telur”: pilih Indomie sebagai bahan utama dan Telur sebagai bahan opsional." >
-        <button v-if="canManage" class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Paket Baru</button>
+        <button v-if="can.create" class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Paket Baru</button>
       </EmptyState>
     </div>
 
@@ -246,8 +252,9 @@ onMounted(() => {
             </div>
             <div>
               <label class="label">Harga jual per {{ form.unit || 'porsi' }}</label>
-              <MoneyInput v-model="form.sell_price" :invalid="!!errors.sell_price" />
+              <MoneyInput v-model="form.sell_price" :invalid="!!errors.sell_price" :disabled="priceLocked" />
               <p v-if="errors.sell_price" class="error-text">{{ errors.sell_price }}</p>
+              <p v-else-if="priceLocked" class="mt-1 flex items-center gap-1 text-xs text-slate-500"><AppIcon name="lock" :size="12" /> Harga dikunci (butuh hak akses Ubah harga jual).</p>
             </div>
           </div>
 
@@ -284,7 +291,7 @@ onMounted(() => {
                 <div>
                   <template v-if="item.is_optional">
                     <label class="text-xs whitespace-nowrap text-slate-500">Potongan jika tanpa</label>
-                    <div class="[&_input]:h-10 [&_input]:py-0"><MoneyInput v-model="item.omit_price" /></div>
+                    <div class="[&_input]:h-10 [&_input]:py-0"><MoneyInput v-model="item.omit_price" :disabled="priceLocked" /></div>
                   </template>
                 </div>
                 <div class="flex items-end justify-end sm:pt-5">
@@ -312,7 +319,7 @@ onMounted(() => {
             <span>Jasa / olahan</span><span class="tabular-nums">{{ rupiah(formCalc.service) }}</span>
           </div>
           <div class="flex justify-between border-t border-slate-200 pt-2 text-base font-bold"><span>Harga jual</span><span class="tabular-nums">{{ rupiah(form.sell_price) }}</span></div>
-          <template v-if="canManage">
+          <template v-if="can.cost">
             <div class="flex justify-between pt-2"><span class="text-slate-500">HPP bahan</span><span class="tabular-nums">{{ rupiah(formCalc.cost) }}</span></div>
             <div class="flex justify-between text-emerald-700"><span>Laba kotor</span><span class="tabular-nums">{{ rupiah(formCalc.profit) }} ({{ formCalc.margin.toFixed(1) }}%)</span></div>
           </template>

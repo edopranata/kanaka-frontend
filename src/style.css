@@ -136,6 +136,16 @@
   .tab-active {
     @apply bg-white text-brand-700 shadow-sm;
   }
+  /* Item menu pengguna (sidebar bawah). */
+  .user-menu-item {
+    @apply flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-900;
+  }
+  .user-menu-item svg {
+    @apply shrink-0 text-slate-400;
+  }
+  .user-menu-item:hover svg {
+    @apply text-slate-600;
+  }
 }
 
 /* Tabel responsif (v-stack): di HP setiap baris menjadi kartu dengan label kolom. */

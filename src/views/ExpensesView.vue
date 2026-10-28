@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
+import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { monthStart, rupiah, tanggal, today } from '../utils/format'
@@ -13,8 +14,11 @@ import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 
+const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
+// Tanpa expenses.view_all daftar hanya berisi pengeluaran yang dicatat sendiri (disaring server).
+const can = { create: auth.can('expenses.create'), update: auth.can('expenses.update'), delete: auth.can('expenses.delete'), viewAll: auth.can('expenses.view_all') }
 
 const filters = reactive({ from: monthStart(), to: today(), category: '' })
 const expenses = ref([])
@@ -83,8 +87,8 @@ onMounted(() => load())
 
 <template>
   <div class="stagger">
-    <PageHeader title="Pengeluaran" subtitle="Biaya operasional toko (mengurangi laba & kas laci bila tunai)">
-      <template #actions>
+    <PageHeader title="Pengeluaran" :subtitle="can.viewAll ? 'Biaya operasional toko (mengurangi laba & kas laci bila tunai)' : 'Pengeluaran yang Anda catat (mengurangi laba & kas laci bila tunai)'">
+      <template v-if="can.create" #actions>
         <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Catat Pengeluaran</button>
       </template>
     </PageHeader>
@@ -110,8 +114,8 @@ onMounted(() => load())
               <td class="num font-medium">{{ rupiah(expense.amount, false) }}</td>
               <td>{{ expense.user }}</td>
               <td class="text-right">
-                <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(expense)"><AppIcon name="pencil" :size="16" /></button>
-                <button class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(expense)"><AppIcon name="trash" :size="16" /></button>
+                <button v-if="can.update" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(expense)"><AppIcon name="pencil" :size="16" /></button>
+                <button v-if="can.delete" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(expense)"><AppIcon name="trash" :size="16" /></button>
               </td>
             </tr>
           </tbody>

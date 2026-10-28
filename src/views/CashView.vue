@@ -16,7 +16,10 @@ import PaginationBar from '../components/PaginationBar.vue'
 const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
-const manager = auth.can('cash.manage')
+// cash.view_all: lihat semua kas & rekening; cash.accounts: kelola rekening & tarik dari rekening; cash.adjust: koreksi saldo.
+const manager = auth.can('cash.view_all')
+const canAccounts = auth.can('cash.accounts')
+const canAdjust = auth.can('cash.adjust')
 
 const kindLabels = { setor: 'Setor ke bank', serah_terima: 'Serah terima kas', tarik: 'Tarik tunai', pindah: 'Pindah rekening' }
 const statusStyles = {
@@ -293,7 +296,7 @@ onMounted(async () => {
     <section v-if="manager" class="mb-5">
       <div class="mb-2 flex items-center justify-between gap-2">
         <h2 class="text-sm font-semibold text-slate-700">Rekening bank</h2>
-        <button class="btn-secondary btn-sm" @click="openBank()"><AppIcon name="plus" :size="14" /> Rekening</button>
+        <button v-if="canAccounts" class="btn-secondary btn-sm" @click="openBank()"><AppIcon name="plus" :size="14" /> Rekening</button>
       </div>
       <div class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
         <div
@@ -314,9 +317,9 @@ onMounted(async () => {
           </div>
           <p class="mt-2 text-xl font-bold tabular-nums" :class="account.balance < 0 ? 'text-red-600' : 'text-slate-900'">{{ rupiah(account.balance) }}</p>
           <div class="mt-2 flex flex-wrap gap-1" @click.stop>
-            <button class="btn-secondary btn-sm" :disabled="!account.is_active" @click="openTransfer('tarik', account)">Tarik tunai</button>
-            <button class="btn-secondary btn-sm" @click="openAdjust(account)">Sesuaikan</button>
-            <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah rekening" @click="openBank(account)"><AppIcon name="pencil" :size="14" /></button>
+            <button v-if="canAccounts" class="btn-secondary btn-sm" :disabled="!account.is_active" @click="openTransfer('tarik', account)">Tarik tunai</button>
+            <button v-if="canAdjust" class="btn-secondary btn-sm" @click="openAdjust(account)">Sesuaikan</button>
+            <button v-if="canAccounts" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah rekening" @click="openBank(account)"><AppIcon name="pencil" :size="14" /></button>
           </div>
         </div>
       </div>
@@ -344,7 +347,7 @@ onMounted(async () => {
       <div v-if="tab === 'mutations'" key="mutations" class="card overflow-hidden">
         <div class="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 p-4">
           <DateRange v-model:from="range.from" v-model:to="range.to" @change="loadLedger" />
-          <div v-if="manager && selected" class="flex gap-2">
+          <div v-if="canAdjust && selected" class="flex gap-2">
             <button class="btn-secondary btn-sm" @click="openAdjust(selected)">Penyesuaian saldo</button>
           </div>
         </div>

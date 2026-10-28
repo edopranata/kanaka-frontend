@@ -8,7 +8,9 @@ import AppIcon from '../components/AppIcon.vue'
 import ConfirmReason from '../components/ConfirmReason.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const route = useRoute()
 const toast = useToastStore()
 const receipt = ref(null)
@@ -50,7 +52,7 @@ onMounted(load)
     <PageHeader :title="receipt?.number || 'Titipan Masuk'" :subtitle="receipt ? `${receipt.supplier.name} · ${tanggal(receipt.date, 'long')}` : ''" :back="{ name: 'consignments', query: { tab: 'receipts' } }">
       <template v-if="receipt" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak</button>
-        <button v-if="receipt.status === 'selesai' && untouched()" class="btn-danger" @click="voiding = true"><AppIcon name="ban" :size="16" /> Batalkan</button>
+        <button v-if="receipt.status === 'selesai' && untouched() && auth.can('consignments.void')" class="btn-danger" @click="voiding = true"><AppIcon name="ban" :size="16" /> Batalkan</button>
       </template>
     </PageHeader>
 

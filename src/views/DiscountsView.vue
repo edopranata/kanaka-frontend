@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
+import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah, tanggal } from '../utils/format'
@@ -14,8 +15,10 @@ import PaginationBar from '../components/PaginationBar.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
+const auth = useAuthStore()
 const meta = useMetaStore()
 const toast = useToastStore()
+const can = { create: auth.can('discounts.create'), update: auth.can('discounts.update'), delete: auth.can('discounts.delete') }
 
 const statuses = [
   { value: '', label: 'Semua' },
@@ -155,7 +158,7 @@ onMounted(() => {
 <template>
   <div class="stagger">
     <PageHeader title="Diskon & Promo" subtitle="Potongan harga untuk produk tertentu dalam periode tertentu. Otomatis diterapkan di Kasir dan Penjualan Kredit.">
-      <template #actions>
+      <template v-if="can.create" #actions>
         <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Promo Baru</button>
       </template>
     </PageHeader>
@@ -197,18 +200,18 @@ onMounted(() => {
               <td class="num">{{ number(discount.usage?.sales || 0) }} trx</td>
               <td class="num font-medium">{{ rupiah(discount.usage?.discount || 0, false) }}</td>
               <td class="text-right whitespace-nowrap">
-                <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" :title="discount.is_active ? 'Nonaktifkan' : 'Aktifkan'" @click="toggle(discount)">
+                <button v-if="can.update" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" :title="discount.is_active ? 'Nonaktifkan' : 'Aktifkan'" @click="toggle(discount)">
                   <AppIcon :name="discount.is_active ? 'ban' : 'check'" :size="16" />
                 </button>
-                <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(discount)"><AppIcon name="pencil" :size="16" /></button>
-                <button v-if="!discount.usage?.sales" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(discount)"><AppIcon name="trash" :size="16" /></button>
+                <button v-if="can.update" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(discount)"><AppIcon name="pencil" :size="16" /></button>
+                <button v-if="can.delete && !discount.usage?.sales" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(discount)"><AppIcon name="trash" :size="16" /></button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
       <EmptyState v-if="!loading && !discounts.length" icon="percent" title="Belum ada promo" text="Buat promo, mis. “Diskon Kopi 10%” untuk beberapa produk dengan periode tertentu.">
-        <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Promo Baru</button>
+        <button v-if="can.create" class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Promo Baru</button>
       </EmptyState>
       <PaginationBar :meta="pagination" @page="load" />
     </div>

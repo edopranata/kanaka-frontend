@@ -184,7 +184,7 @@ function header(doc, store) {
 /** Baris catatan kaki struk (diatur per baris di Pengaturan, maks. 32 karakter per baris). */
 export const footerLines = (footer) => String(footer || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
 
-/** Ukuran kotak QR (titik printer) per pilihan ukuran di Pengaturan → Printer. */
+/** Ukuran kotak QR (titik printer) per pilihan ukuran di halaman Printer Struk. */
 export const QR_MODULES = { kecil: 3, sedang: 4, besar: 5 }
 
 function footer(doc, store, qrUrl, qrSize) {
@@ -239,12 +239,13 @@ export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl
 }
 
 /** Halaman tes printer: lebar kolom, perataan, huruf tebal/besar, dan contoh baris struk. */
-export function testPageBytes({ store, columns, paper, connection, feed = 3, cut = true, qrUrl = null, qrSize = 'sedang' }) {
+export function testPageBytes({ store, columns, paper, connection, device = '', feed = 3, cut = true, qrUrl = null, qrSize = 'sedang' }) {
   const doc = new EscPos(columns)
   header(doc, store)
   doc.separator('=').align('center').bold(true).line('TES PRINTER').bold(false).line(waktu(new Date().toISOString())).align('left').separator('=')
   doc.line(`Kertas  : ${paper} mm (${columns} karakter)`)
   doc.line(`Koneksi : ${connection}`)
+  if (device) doc.line(`Perangkat: ${device}`)
   doc.separator()
   doc.line('Penggaris lebar kertas:')
   doc.line('1234567890'.repeat(Math.ceil(columns / 10)).slice(0, columns))

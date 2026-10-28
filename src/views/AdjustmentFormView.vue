@@ -8,7 +8,11 @@ import { number, today } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
+// Masuk / keluar butuh stock.adjust, opname butuh stock.opname.
+const allowedTypes = computed(() => meta.adjustment_types.filter((type) => auth.can(type.value === 'opname' ? 'stock.opname' : 'stock.adjust')))
 const route = useRoute()
 const router = useRouter()
 const meta = useMetaStore()
@@ -21,7 +25,7 @@ const reasons = {
 }
 
 const form = reactive({
-  type: ['masuk', 'keluar', 'opname'].includes(route.query.type) ? route.query.type : 'keluar',
+  type: allowedTypes.value.some((type) => type.value === route.query.type) ? route.query.type : allowedTypes.value[0]?.value,
   date: today(),
   reason: '',
   notes: '',
@@ -107,8 +111,8 @@ async function save() {
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Jenis</label>
-          <div class="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
-            <button v-for="type in meta.adjustment_types" :key="type.value" type="button" class="tab justify-center" :class="{ 'tab-active': form.type === type.value }" @click="form.type = type.value">
+          <div class="grid gap-1 rounded-lg bg-slate-100 p-1" :style="{ gridTemplateColumns: `repeat(${allowedTypes.length}, minmax(0, 1fr))` }">
+            <button v-for="type in allowedTypes" :key="type.value" type="button" class="tab justify-center" :class="{ 'tab-active': form.type === type.value }" @click="form.type = type.value">
               {{ type.label.replace('Stok ', '') }}
             </button>
           </div>

@@ -9,7 +9,9 @@ import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const toast = useToastStore()
 const filters = reactive({ from: monthStart(), to: today(), search: '' })
 const purchases = ref([])
@@ -36,7 +38,7 @@ onMounted(() => load())
   <div class="stagger">
     <PageHeader title="Pembelian" subtitle="Barang masuk dari supplier (menambah stok & memperbarui HPP)">
       <template #actions>
-        <RouterLink :to="{ name: 'purchase-create' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Pembelian Baru</RouterLink>
+        <RouterLink v-if="auth.can('purchases.create')" :to="{ name: 'purchase-create' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Pembelian Baru</RouterLink>
       </template>
     </PageHeader>
 

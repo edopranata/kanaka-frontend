@@ -120,7 +120,7 @@ defineExpose({ focus: () => input.value?.focus() })
             </div>
           </Transition>
         </div>
-        <button v-if="auth.can('customers.manage')" type="button" class="btn-secondary px-3" title="Pelanggan baru" @click="form = { name: term, phone: '', address: '', credit_limit: 0 }">
+        <button v-if="auth.can('customers.create')" type="button" class="btn-secondary px-3" title="Pelanggan baru" @click="form = { name: term, phone: '', address: '', credit_limit: 0 }">
           <AppIcon name="plus" :size="18" />
         </button>
       </div>

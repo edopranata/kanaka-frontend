@@ -44,7 +44,7 @@ onMounted(() => load())
   <div class="stagger">
     <PageHeader title="Penjualan Kredit (Bon)" subtitle="Ambil dulu, bayar nanti — ditagih bulanan per pelanggan">
       <template #actions>
-        <RouterLink v-if="auth.can('receivables.manage')" :to="{ name: 'bills' }" class="btn-secondary"><AppIcon name="document" :size="16" /> Tagihan & Piutang</RouterLink>
+        <RouterLink v-if="auth.can('receivables.view')" :to="{ name: 'bills' }" class="btn-secondary"><AppIcon name="document" :size="16" /> Tagihan & Piutang</RouterLink>
         <RouterLink :to="{ name: 'credit-sale-create' }" class="btn-primary"><AppIcon name="plus" :size="16" /> Bon Baru</RouterLink>
       </template>
     </PageHeader>
@@ -81,7 +81,7 @@ onMounted(() => load())
               <td class="num font-medium" :class="{ 'text-slate-400 line-through': sale.status === 'batal' }">{{ rupiah(sale.total) }}</td>
               <td>
                 <StatusBadge v-if="sale.status === 'batal'" status="batal" />
-                <RouterLink v-else-if="sale.bill && auth.can('receivables.manage')" :to="{ name: 'bill', params: { id: sale.bill.id } }" class="text-brand-700 hover:underline" @click.stop>
+                <RouterLink v-else-if="sale.bill && auth.can('receivables.view')" :to="{ name: 'bill', params: { id: sale.bill.id } }" class="text-brand-700 hover:underline" @click.stop>
                   {{ sale.bill.number }}
                 </RouterLink>
                 <span v-else-if="sale.bill">{{ sale.bill.number }}</span>

@@ -6,9 +6,16 @@ import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
 import PageHeader from '../components/PageHeader.vue'
+import UserAvatar from '../components/UserAvatar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const auth = useAuthStore()
+const can = {
+  create: auth.can('users.create'),
+  update: auth.can('users.update'),
+  delete: auth.can('users.delete'),
+  security: auth.can('users.security'),
+}
 const toast = useToastStore()
 
 const users = ref([])
@@ -89,7 +96,7 @@ async function resendPassword(user) {
 }
 
 async function resetTwoFactor(user) {
-  if (!confirm(`Nonaktifkan verifikasi 2 langkah ${user.name}?\n\nGunakan bila HP-nya hilang dan kode pemulihan tidak ada. ${user.name} perlu masuk ulang dan bisa mengaktifkannya lagi di Akun Saya.`)) return
+  if (!confirm(`Nonaktifkan verifikasi 2 langkah ${user.name}?\n\nGunakan bila HP-nya hilang dan kode pemulihan tidak ada. ${user.name} perlu masuk ulang dan bisa mengaktifkannya lagi di Profil Saya.`)) return
   busy.value = 'two_factor'
   try {
     const { data } = await http.delete(`/users/${user.id}/two-factor`)
@@ -131,7 +138,7 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
     <PageHeader title="Pengguna" subtitle="Akun dan role (jabatan) masing-masing">
       <template #actions>
         <RouterLink v-if="auth.can('roles.manage')" :to="{ name: 'roles' }" class="btn-secondary"><AppIcon name="shield" :size="16" /> Role & Hak Akses</RouterLink>
-        <button class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Pengguna Baru</button>
+        <button v-if="can.create" class="btn-primary" @click="openForm()"><AppIcon name="plus" :size="16" /> Pengguna Baru</button>
       </template>
     </PageHeader>
 
@@ -151,7 +158,12 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
           <thead><tr><th>Nama</th><th>Nama Pengguna</th><th>Role</th><th>Email</th><th>Keamanan</th><th>Status</th><th></th></tr></thead>
           <tbody>
             <tr v-for="user in users" :key="user.id">
-              <td class="font-medium">{{ user.name }} <span v-if="user.id === auth.user?.id" class="text-xs text-slate-400">(Anda)</span></td>
+              <td class="font-medium">
+                <span class="inline-flex items-center gap-2.5">
+                  <UserAvatar :user="user" :size="30" />
+                  <span>{{ user.name }} <span v-if="user.id === auth.user?.id" class="text-xs text-slate-400">(Anda)</span></span>
+                </span>
+              </td>
               <td>{{ user.username }}</td>
               <td>{{ user.role_label }}</td>
               <td>{{ user.email || '-' }}</td>
@@ -170,8 +182,8 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
               </td>
               <td class="text-right">
                 <template v-if="user.can_manage">
-                  <button class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Ubah" @click="openForm(user)"><AppIcon name="pencil" :size="16" /></button>
-                  <button v-if="user.id !== auth.user?.id" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(user)"><AppIcon name="trash" :size="16" /></button>
+                  <button v-if="can.update || (can.security && user.id !== auth.user?.id)" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" :title="can.update ? 'Ubah' : 'Keamanan akun'" @click="openForm(user)"><AppIcon name="pencil" :size="16" /></button>
+                  <button v-if="can.delete && user.id !== auth.user?.id" class="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600" title="Hapus" @click="remove(user)"><AppIcon name="trash" :size="16" /></button>
                 </template>
               </td>
             </tr>
@@ -182,6 +194,8 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
 
     <AppModal v-if="form" :title="form.id ? 'Ubah Pengguna' : 'Pengguna Baru'" @close="form = null">
       <form id="user-form" class="grid gap-3 sm:grid-cols-2" @submit.prevent="save">
+        <!-- Tanpa hak ubah (hanya keamanan akun) data pengguna hanya ditampilkan. -->
+        <fieldset class="contents" :disabled="Boolean(form.id) && !can.update">
         <div class="sm:col-span-2">
           <label class="label">Nama lengkap</label>
           <input v-model="form.name" class="input" :class="{ 'input-error': errors.name }" required />
@@ -213,8 +227,10 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
           <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300" :disabled="form.id === auth.user?.id" /> Akun aktif
         </label>
 
+        </fieldset>
+
         <!-- Keamanan akun pengguna lain -->
-        <div v-if="form.id && form.id !== auth.user?.id" class="space-y-2 rounded-xl border border-slate-200 p-3 text-sm sm:col-span-2">
+        <div v-if="can.security && form.id && form.id !== auth.user?.id" class="space-y-2 rounded-xl border border-slate-200 p-3 text-sm sm:col-span-2">
           <p class="font-medium">Keamanan</p>
           <p v-if="passwordStatus(form)" class="text-xs text-slate-500">Masih memakai kata sandi sementara (berlaku sampai {{ formatDate(form.password_expires_at) }}).</p>
           <div class="flex flex-wrap gap-2">
@@ -225,7 +241,7 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
       </form>
       <template #footer>
         <button class="btn-secondary" @click="form = null">Batal</button>
-        <button class="btn-primary" type="submit" form="user-form" :disabled="saving">{{ saving ? 'Menyimpan…' : form.id ? 'Simpan' : 'Simpan & kirim email' }}</button>
+        <button v-if="!form.id || can.update" class="btn-primary" type="submit" form="user-form" :disabled="saving">{{ saving ? 'Menyimpan…' : form.id ? 'Simpan' : 'Simpan & kirim email' }}</button>
       </template>
     </AppModal>
 

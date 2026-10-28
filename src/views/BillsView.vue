@@ -12,7 +12,9 @@ import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useAuthStore } from '../stores/auth'
 
+const auth = useAuthStore()
 const router = useRouter()
 const toast = useToastStore()
 
@@ -101,7 +103,7 @@ onMounted(() => loadBills())
     <PageHeader title="Tagihan & Piutang" subtitle="Tagihan bulanan penjualan kredit dan pembayarannya">
       <template #actions>
         <RouterLink :to="{ name: 'credit-sales' }" class="btn-secondary"><AppIcon name="book" :size="16" /> Daftar Bon</RouterLink>
-        <button class="btn-primary" @click="openGenerate()"><AppIcon name="document" :size="16" /> Buat Tagihan</button>
+        <button v-if="auth.can('bills.generate')" class="btn-primary" @click="openGenerate()"><AppIcon name="document" :size="16" /> Buat Tagihan</button>
       </template>
     </PageHeader>
 
@@ -182,7 +184,7 @@ onMounted(() => loadBills())
                   <td class="num" :class="{ 'font-medium text-red-600': row.overdue }">{{ rupiah(row.overdue, false) }}</td>
                   <td class="num font-semibold">{{ rupiah(row.outstanding, false) }}</td>
                   <td class="text-right">
-                    <button v-if="row.unbilled" class="btn-secondary btn-sm" @click="openGenerate(row.customer)">Tagih sekarang</button>
+                    <button v-if="row.unbilled && auth.can('bills.generate')" class="btn-secondary btn-sm" @click="openGenerate(row.customer)">Tagih sekarang</button>
                   </td>
                 </tr>
               </tbody>

@@ -110,7 +110,7 @@ onMounted(load)
         <template v-if="sale.payment_method === 'piutang'">
           <div class="flex justify-between gap-3">
             <span class="text-slate-500">Tagihan</span>
-            <RouterLink v-if="sale.bill && auth.can('receivables.manage')" :to="{ name: 'bill', params: { id: sale.bill.id } }" class="font-medium text-brand-700 hover:underline">{{ sale.bill.number }}</RouterLink>
+            <RouterLink v-if="sale.bill && auth.can('receivables.view')" :to="{ name: 'bill', params: { id: sale.bill.id } }" class="font-medium text-brand-700 hover:underline">{{ sale.bill.number }}</RouterLink>
             <span v-else-if="sale.bill">{{ sale.bill.number }}</span>
             <StatusBadge v-else status="belum_ditagih" />
           </div>

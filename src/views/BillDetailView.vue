@@ -12,6 +12,7 @@ import AppModal from '../components/AppModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -189,9 +190,7 @@ onMounted(load)
         </div>
         <div>
           <label class="label">Metode</label>
-          <select v-model="payForm.payment_method" class="input">
-            <option v-for="method in meta.payment_methods" :key="method.value" :value="method.value">{{ method.label }}</option>
-          </select>
+          <AppSelect v-model="payForm.payment_method" class="input" :options="meta.payment_methods" />
           <p class="mt-1 text-xs text-slate-500">{{ payForm.payment_method === 'tunai' ? 'Tunai masuk ke kas fisik Anda.' : 'Non tunai masuk ke rekening bank.' }}</p>
         </div>
         <BankSelect v-model="payForm.cash_account_id" :method="payForm.payment_method" label="Ke rekening" />

@@ -19,7 +19,8 @@ export default defineConfig(({ mode }) => {
       vue(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        // Versi baru menunggu konfirmasi pengguna (lihat UpdatePrompt.vue), bukan memuat ulang sendiri.
+        registerType: 'prompt',
         includeAssets: ['favicon.ico', 'favicon.svg', 'apple-touch-icon-180x180.png'],
         manifest: {
           id: '/',

@@ -12,6 +12,7 @@ import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -240,10 +241,7 @@ onMounted(() => {
             </div>
             <div>
               <label class="label">Kategori</label>
-              <select v-model="form.category_id" class="input">
-                <option value="">Tanpa kategori</option>
-                <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-              </select>
+              <AppSelect v-model="form.category_id" class="input" :options="categories" value-key="id" label-key="name" empty="Tanpa kategori" />
             </div>
             <div>
               <label class="label">Satuan jual</label>

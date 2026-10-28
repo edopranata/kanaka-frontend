@@ -8,6 +8,8 @@ import AppIcon from '../components/AppIcon.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
+import AppSelect from '../components/AppSelect.vue'
+import DateInput from '../components/DateInput.vue'
 
 const router = useRouter()
 const toast = useToastStore()
@@ -75,15 +77,12 @@ onMounted(async () => {
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Supplier (penitip)</label>
-          <select v-model="form.supplier_id" class="input" :class="{ 'input-error': errors.supplier_id }">
-            <option value="">— Pilih supplier —</option>
-            <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
-          </select>
+          <AppSelect v-model="form.supplier_id" class="input" :class="{ 'input-error': errors.supplier_id }" :options="suppliers" value-key="id" label-key="name" empty="— Pilih supplier —" />
           <p v-if="errors.supplier_id" class="error-text">{{ errors.supplier_id }}</p>
         </div>
         <div>
           <label class="label">Tanggal</label>
-          <input v-model="form.date" type="date" class="input" :max="today()" />
+          <DateInput v-model="form.date" class="input" :max="today()" />
         </div>
         <div>
           <label class="label">Catatan</label>

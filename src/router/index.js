@@ -130,6 +130,19 @@ router.beforeEach(async (to) => {
   }
 })
 
+// Setelah rilis baru, file halaman versi lama sudah dihapus dari server: muat ulang ke halaman tujuan
+// (sekali saja dalam 10 detik agar tidak berulang bila memang sedang offline).
+router.onError((error, to) => {
+  if (!/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(error?.message || '')) return
+  try {
+    if (Date.now() - Number(sessionStorage.getItem('chunk-reload') || 0) < 10000) return
+    sessionStorage.setItem('chunk-reload', String(Date.now()))
+  } catch {
+    // tanpa penyimpanan sesi: tetap coba muat ulang
+  }
+  window.location.assign(to.fullPath)
+})
+
 router.afterEach((to) => {
   const meta = useMetaStore()
   const store = meta.store?.name || meta.app?.name || 'Aplikasi Penjualan'

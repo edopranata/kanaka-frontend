@@ -7,6 +7,8 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
+import AppSelect from '../components/AppSelect.vue'
+import NumberInput from '../components/NumberInput.vue'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -397,15 +399,19 @@ onMounted(async () => {
               <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label class="label">Nomor urut diulang setiap</label>
-                  <select v-model="form.doc_number_reset" class="input">
-                    <option value="daily">Hari (INV-20260928-0001)</option>
-                    <option value="monthly">Bulan (INV-202609-0001)</option>
-                    <option value="yearly">Tahun (INV-2026-0001)</option>
-                  </select>
+                  <AppSelect
+                    v-model="form.doc_number_reset"
+                    class="input"
+                    :options="[
+                      { value: 'daily', label: 'Hari (INV-20260928-0001)' },
+                      { value: 'monthly', label: 'Bulan (INV-202609-0001)' },
+                      { value: 'yearly', label: 'Tahun (INV-2026-0001)' },
+                    ]"
+                  />
                 </div>
                 <div>
                   <label class="label">Jumlah digit nomor urut</label>
-                  <input v-model.number="form.doc_number_digits" type="number" min="3" max="8" class="input" :class="{ 'input-error': errors.doc_number_digits }" />
+                  <NumberInput v-model="form.doc_number_digits" :min="3" :max="8" suffix="digit" :invalid="!!errors.doc_number_digits" />
                   <p v-if="errors.doc_number_digits" class="error-text">{{ errors.doc_number_digits }}</p>
                 </div>
               </div>
@@ -441,7 +447,7 @@ onMounted(async () => {
                 </div>
                 <div>
                   <label class="label">Jumlah digit</label>
-                  <input v-model.number="form.sku_digits" type="number" min="3" max="10" class="input" :class="{ 'input-error': errors.sku_digits }" />
+                  <NumberInput v-model="form.sku_digits" :min="3" :max="10" suffix="digit" :invalid="!!errors.sku_digits" />
                 </div>
               </div>
               <p class="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
@@ -457,7 +463,7 @@ onMounted(async () => {
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
                 <label class="label">Pajak penjualan (%)</label>
-                <input v-model.number="form.tax_percent" type="number" min="0" max="100" step="0.01" class="input" :class="{ 'input-error': errors.tax_percent }" />
+                <NumberInput v-model="form.tax_percent" :min="0" :max="100" :step="0.01" suffix="%" :invalid="!!errors.tax_percent" />
                 <p class="mt-1 text-xs text-slate-500">Isi 0 jika tidak memungut pajak (mis. PPN 11).</p>
               </div>
 
@@ -467,7 +473,7 @@ onMounted(async () => {
               </div>
               <div>
                 <label class="label">Stok minimum bawaan produk baru</label>
-                <input v-model.number="form.default_min_stock" type="number" min="0" class="input" />
+                <NumberInput v-model="form.default_min_stock" :min="0" />
               </div>
               <div>
                 <label class="label">Satuan bawaan paket / menu olahan</label>
@@ -513,17 +519,23 @@ onMounted(async () => {
               <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div v-for="item in bankMethods" :key="item.key">
                   <label class="label">{{ item.label }}</label>
-                  <select v-model.number="form[item.key]" class="input" :class="{ 'input-error': errors[item.key] }">
-                    <option :value="0">Rekening pertama{{ banks[0] ? ` (${banks[0].name})` : '' }}</option>
-                    <option v-for="bank in banks" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
-                  </select>
+                  <AppSelect
+                    v-model="form[item.key]"
+                    class="input"
+                    :class="{ 'input-error': errors[item.key] }"
+                    :options="banks"
+                    value-key="id"
+                    label-key="name"
+                    :empty="`Rekening pertama${banks[0] ? ` (${banks[0].name})` : ''}`"
+                    :empty-value="0"
+                  />
                   <p v-if="errors[item.key]" class="error-text">{{ errors[item.key] }}</p>
                 </div>
               </div>
             </div>
             <div class="max-w-xs">
               <label class="label">Jatuh tempo tagihan (hari setelah tagihan dibuat)</label>
-              <input v-model.number="form.bill_due_days" type="number" min="0" max="90" class="input" :class="{ 'input-error': errors.bill_due_days }" />
+              <NumberInput v-model="form.bill_due_days" :min="0" :max="90" suffix="hari" :invalid="!!errors.bill_due_days" />
             </div>
           </section>
 
@@ -536,10 +548,7 @@ onMounted(async () => {
               </div>
               <div class="max-w-xs">
                 <label class="label">Masa berlaku kata sandi sementara</label>
-                <div class="relative">
-                  <input v-model.number="form.temp_password_hours" type="number" min="1" max="168" class="input pr-14" :class="{ 'input-error': errors.temp_password_hours }" />
-                  <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-400">jam</span>
-                </div>
+                <NumberInput v-model="form.temp_password_hours" :min="1" :max="168" suffix="jam" :invalid="!!errors.temp_password_hours" />
                 <p v-if="errors.temp_password_hours" class="error-text">{{ errors.temp_password_hours }}</p>
                 <p v-else class="mt-1 text-xs text-slate-500">= {{ tempPasswordLabel }}. Maks. 168 jam (7 hari). Setelah lewat, pengguna memakai "Lupa kata sandi?" atau minta dikirim ulang.</p>
               </div>
@@ -588,10 +597,7 @@ onMounted(async () => {
               <div class="grid gap-4 sm:grid-cols-2">
                 <div v-for="item in retention" :key="item.key">
                   <label class="label">{{ item.label }}</label>
-                  <div class="relative">
-                    <input v-model.number="form[item.key]" type="number" :min="item.min" :max="item.max" class="input pr-14" :class="{ 'input-error': errors[item.key] }" />
-                    <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-400">{{ item.unit }}</span>
-                  </div>
+                  <NumberInput v-model="form[item.key]" :min="item.min" :max="item.max" :suffix="item.unit" :invalid="!!errors[item.key]" />
                   <p v-if="errors[item.key]" class="error-text">{{ errors[item.key] }}</p>
                   <p class="mt-1 text-xs text-slate-500">{{ item.hint }}</p>
                 </div>

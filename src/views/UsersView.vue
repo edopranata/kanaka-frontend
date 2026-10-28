@@ -8,6 +8,7 @@ import AppModal from '../components/AppModal.vue'
 import PageHeader from '../components/PageHeader.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const auth = useAuthStore()
 const can = {
@@ -213,10 +214,16 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
         </div>
         <div>
           <label class="label">Role</label>
-          <select v-model="form.role_id" class="input" :class="{ 'input-error': errors.role_id }" :disabled="form.id === auth.user?.id" required>
-            <option v-if="form.id === auth.user?.id" :value="form.role_id">{{ form.role_label }}</option>
-            <option v-for="role in assignable()" :key="role.id" :value="role.id">{{ role.name }}</option>
-          </select>
+          <AppSelect
+            v-model="form.role_id"
+            class="input"
+            :class="{ 'input-error': errors.role_id }"
+            :options="form.id === auth.user?.id ? [{ id: form.role_id, name: form.role_label }] : assignable()"
+            value-key="id"
+            label-key="name"
+            placeholder="Pilih role…"
+            :disabled="form.id === auth.user?.id"
+          />
           <p v-if="errors.role_id" class="error-text">{{ errors.role_id }}</p>
         </div>
         <p v-if="!form.id" class="flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800 sm:col-span-2">

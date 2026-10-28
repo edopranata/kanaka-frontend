@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import http from '../api/http'
+import AppSelect from './AppSelect.vue'
 
 /**
  * Pilih rekening untuk pembayaran non tunai. Tunai selalu memakai kas fisik pengguna yang mencatat.
@@ -25,9 +26,6 @@ onMounted(async () => {
 <template>
   <div v-if="visible">
     <label class="label">{{ label }}</label>
-    <select v-model="model" class="input">
-      <option :value="null">Default untuk metode ini</option>
-      <option v-for="bank in banks" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
-    </select>
+    <AppSelect v-model="model" class="input" :options="banks" value-key="id" label-key="name" empty="Default untuk metode ini" :empty-value="null" />
   </div>
 </template>

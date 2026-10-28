@@ -11,6 +11,7 @@ import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -53,16 +54,26 @@ onMounted(() => load())
       <DateRange v-model:from="filters.from" v-model:to="filters.to" @change="load()" />
       <div class="grid gap-2 sm:grid-cols-3">
         <CustomerPicker v-model="customer" />
-        <select v-model="filters.billed" class="input" @change="load()">
-          <option value="">Semua bon</option>
-          <option value="0">Belum ditagih</option>
-          <option value="1">Sudah masuk tagihan</option>
-        </select>
-        <select v-model="filters.status" class="input" @change="load()">
-          <option value="selesai">Aktif</option>
-          <option value="batal">Dibatalkan</option>
-          <option value="">Semua status</option>
-        </select>
+        <AppSelect
+          v-model="filters.billed"
+          class="input"
+          :options="[
+            { value: '0', label: 'Belum ditagih' },
+            { value: '1', label: 'Sudah masuk tagihan' },
+          ]"
+          empty="Semua bon"
+          @change="load()"
+        />
+        <AppSelect
+          v-model="filters.status"
+          class="input"
+          :options="[
+            { value: 'selesai', label: 'Aktif' },
+            { value: 'batal', label: 'Dibatalkan' },
+            { value: '', label: 'Semua status' },
+          ]"
+          @change="load()"
+        />
       </div>
     </div>
 

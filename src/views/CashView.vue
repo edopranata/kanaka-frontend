@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -382,13 +383,18 @@ onMounted(async () => {
 
       <div v-else key="history" class="card overflow-hidden">
         <div class="border-b border-slate-100 p-4">
-          <select v-model="historyStatus" class="input max-w-60" @change="loadHistory()">
-            <option value="">Semua status</option>
-            <option value="menunggu">Menunggu konfirmasi</option>
-            <option value="selesai">Selesai</option>
-            <option value="ditolak">Ditolak</option>
-            <option value="dibatalkan">Dibatalkan</option>
-          </select>
+          <AppSelect
+            v-model="historyStatus"
+            class="input max-w-60"
+            :options="[
+              { value: 'menunggu', label: 'Menunggu konfirmasi' },
+              { value: 'selesai', label: 'Selesai' },
+              { value: 'ditolak', label: 'Ditolak' },
+              { value: 'dibatalkan', label: 'Dibatalkan' },
+            ]"
+            empty="Semua status"
+            @change="loadHistory()"
+          />
         </div>
         <div class="table-wrap">
           <table v-stack class="table">
@@ -424,9 +430,7 @@ onMounted(async () => {
         <p class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">{{ modes[transfer.mode].hint }}</p>
         <div>
           <label class="label">Dari</label>
-          <select v-if="transfer.mode === 'tarik'" v-model="transfer.from_account_id" class="input">
-            <option v-for="bank in banks.filter((account) => account.is_active)" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
-          </select>
+          <AppSelect v-if="transfer.mode === 'tarik'" v-model="transfer.from_account_id" class="input" :options="banks.filter((account) => account.is_active)" value-key="id" label-key="name" placeholder="Pilih rekening…" />
           <p v-else class="input flex items-center bg-slate-50">{{ transferSource?.name }}</p>
           <p class="mt-1 text-xs text-slate-500">
             Saldo tersedia <b class="tabular-nums">{{ rupiah(available(transferSource)) }}</b>
@@ -436,13 +440,26 @@ onMounted(async () => {
         </div>
         <div>
           <label class="label">Ke</label>
-          <select v-if="transfer.mode === 'setor'" v-model="transfer.to_account_id" class="input" :class="{ 'input-error': errors.to_account_id }" required>
-            <option v-for="bank in banks.filter((account) => account.is_active)" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
-          </select>
-          <select v-else-if="transfer.mode === 'serah'" v-model="transfer.to_account_id" class="input" :class="{ 'input-error': errors.to_account_id }" required>
-            <option :value="null" disabled>Pilih penerima…</option>
-            <option v-for="account in handoverTargets" :key="account.id" :value="account.id">{{ account.name.replace(/^Kas /, '') }}{{ account.role ? ` — ${account.role}` : '' }}</option>
-          </select>
+          <AppSelect
+            v-if="transfer.mode === 'setor'"
+            v-model="transfer.to_account_id"
+            class="input"
+            :class="{ 'input-error': errors.to_account_id }"
+            :options="banks.filter((account) => account.is_active)"
+            value-key="id"
+            label-key="name"
+            placeholder="Pilih rekening…"
+          />
+          <AppSelect
+            v-else-if="transfer.mode === 'serah'"
+            v-model="transfer.to_account_id"
+            class="input"
+            :class="{ 'input-error': errors.to_account_id }"
+            :options="handoverTargets"
+            value-key="id"
+            :label-key="(account) => `${account.name.replace(/^Kas /, '')}${account.role ? ` — ${account.role}` : ''}`"
+            placeholder="Pilih penerima…"
+          />
           <p v-else class="input flex items-center bg-slate-50">{{ myDrawer?.name }}</p>
           <p v-if="errors.to_account_id" class="error-text">{{ errors.to_account_id }}</p>
         </div>

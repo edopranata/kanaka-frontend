@@ -168,7 +168,7 @@ onMounted(async () => {
       </div>
       <EmptyState v-if="!loading && !lines.length" icon="inbox" title="Tidak ada titipan terbuka" text="Semua titipan supplier ini sudah diselesaikan." />
 
-      <div v-if="lines.length" class="grid gap-4 border-t border-slate-200 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div v-if="lines.length" class="grid grid-cols-1 gap-4 border-t border-slate-200 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div class="space-y-3 text-sm">
           <div>
             <label class="label">Catatan</label>
@@ -184,9 +184,9 @@ onMounted(async () => {
             <span class="font-semibold">Total dibayar ke supplier</span>
             <span class="text-2xl font-bold text-brand-700 tabular-nums">{{ rupiah(total) }}</span>
           </div>
-          <div class="grid grid-cols-2 gap-1 rounded-lg bg-white p-1">
-            <button type="button" class="tab justify-center" :class="{ 'tab-active bg-brand-50': !form.pay_now }" @click="form.pay_now = false">Bayar nanti (hutang)</button>
-            <button type="button" class="tab justify-center" :class="{ 'tab-active bg-brand-50': form.pay_now }" @click="form.pay_now = true">Bayar sekarang</button>
+          <div class="segmented bg-white">
+            <button type="button" class="tab" :class="{ 'tab-active bg-brand-50': !form.pay_now }" @click="form.pay_now = false">Bayar nanti (hutang)</button>
+            <button type="button" class="tab" :class="{ 'tab-active bg-brand-50': form.pay_now }" @click="form.pay_now = true">Bayar sekarang</button>
           </div>
           <AppSelect v-if="form.pay_now" v-model="form.payment_method" class="input" :options="meta.payment_methods" />
           <p v-if="form.pay_now && form.payment_method === 'tunai'" class="text-xs text-slate-500">Diambil dari kas fisik Anda — otomatis tercatat di Kas &amp; Bank.</p>

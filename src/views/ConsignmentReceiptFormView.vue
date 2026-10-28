@@ -73,7 +73,7 @@ onMounted(async () => {
   <div class="stagger">
     <PageHeader title="Titipan Masuk" subtitle="Barang yang dititipkan supplier. Belum menjadi hutang — dibayar saat penyelesaian sesuai yang terjual." :back="{ name: 'consignments', query: { tab: 'receipts' } }" />
 
-    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Supplier (penitip)</label>

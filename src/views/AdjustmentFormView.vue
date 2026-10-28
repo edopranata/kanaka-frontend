@@ -112,8 +112,8 @@ async function save() {
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Jenis</label>
-          <div class="grid gap-1 rounded-lg bg-slate-100 p-1" :style="{ gridTemplateColumns: `repeat(${allowedTypes.length}, minmax(0, 1fr))` }">
-            <button v-for="type in allowedTypes" :key="type.value" type="button" class="tab justify-center" :class="{ 'tab-active': form.type === type.value }" @click="form.type = type.value">
+          <div class="segmented">
+            <button v-for="type in allowedTypes" :key="type.value" type="button" class="tab" :class="{ 'tab-active': form.type === type.value }" @click="form.type = type.value">
               {{ type.label.replace('Stok ', '') }}
             </button>
           </div>

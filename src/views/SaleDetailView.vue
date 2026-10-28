@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import http, { errorMessage } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, tanggal, waktu } from '../utils/format'
+import { number, rupiah, tanggal, taxLabel, waktu } from '../utils/format'
 import { printReceipt } from '../utils/print'
 import AppIcon from '../components/AppIcon.vue'
 import ConfirmReason from '../components/ConfirmReason.vue'
@@ -93,7 +93,7 @@ onMounted(load)
             <tfoot>
               <tr><td colspan="4" class="text-right">Subtotal</td><td class="num">{{ rupiah(sale.subtotal, false) }}</td></tr>
               <tr v-if="sale.discount"><td colspan="4" class="text-right">Diskon</td><td class="num">-{{ rupiah(sale.discount, false) }}</td></tr>
-              <tr v-if="sale.tax"><td colspan="4" class="text-right">Pajak</td><td class="num">{{ rupiah(sale.tax, false) }}</td></tr>
+              <tr v-if="sale.tax"><td colspan="4" class="text-right">{{ taxLabel(sale) }}</td><td class="num">{{ rupiah(sale.tax, false) }}</td></tr>
               <tr><td colspan="4" class="text-right">Total</td><td class="num text-base text-brand-700">{{ rupiah(sale.total) }}</td></tr>
             </tfoot>
           </table>

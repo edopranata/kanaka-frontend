@@ -15,6 +15,15 @@ export function percent(value) {
   return `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(Number(value) || 0)}%`
 }
 
+/**
+ * Label pajak, mis. "PPN 11%" atau "PB1 10,5%", dari tax_name & tax_percent transaksi (atau pengaturan).
+ * Transaksi lama tanpa data tarif cukup "Pajak".
+ */
+export function taxLabel({ tax_name: name, tax_percent: rate } = {}) {
+  const value = rate === null || rate === undefined || rate === '' ? '' : ` ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(Number(rate))}%`
+  return `${name || 'Pajak'}${value}`
+}
+
 export function tanggal(value, month = 'short') {
   if (!value) return '-'
   return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', {

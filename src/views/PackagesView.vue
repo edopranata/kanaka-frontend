@@ -226,7 +226,7 @@ onMounted(() => {
 
     <!-- Form paket -->
     <AppModal v-if="form" :title="form.id ? 'Ubah Paket' : 'Paket Baru'" size="xl" @close="form = null">
-      <form id="package-form" class="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" @submit.prevent="save">
+      <form id="package-form" class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" @submit.prevent="save">
         <div class="space-y-4">
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -281,9 +281,9 @@ onMounted(() => {
                 </div>
                 <div>
                   <label class="text-xs text-slate-500">Jenis</label>
-                  <div class="grid h-10 grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-                    <button type="button" class="tab justify-center px-1 text-xs" :class="{ 'tab-active': !item.is_optional }" @click="item.is_optional = false">Utama</button>
-                    <button type="button" class="tab justify-center px-1 text-xs" :class="{ 'tab-active': item.is_optional }" @click="item.is_optional = true">Opsional</button>
+                  <div class="segmented h-10">
+                    <button type="button" class="tab px-1 text-xs" :class="{ 'tab-active': !item.is_optional }" @click="item.is_optional = false">Utama</button>
+                    <button type="button" class="tab px-1 text-xs" :class="{ 'tab-active': item.is_optional }" @click="item.is_optional = true">Opsional</button>
                   </div>
                 </div>
                 <div>

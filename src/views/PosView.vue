@@ -4,7 +4,7 @@ import http, { errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah } from '../utils/format'
+import { number, rupiah, taxLabel } from '../utils/format'
 import { printReceipt } from '../utils/print'
 import { printerConfig, printerNotice } from '../utils/printer'
 import AppIcon from '../components/AppIcon.vue'
@@ -495,7 +495,7 @@ onBeforeUnmount(() => {
       <div class="space-y-1.5 border-t border-slate-200 p-3 text-sm">
         <div class="flex justify-between"><span class="text-slate-500">Subtotal ({{ number(itemCount) }} item)</span><span class="tabular-nums">{{ rupiah(grossTotal) }}</span></div>
         <div v-if="savings" class="flex justify-between text-rose-700"><span>Hemat promo</span><span class="tabular-nums">−{{ rupiah(savings) }}</span></div>
-        <div v-if="meta.tax_percent" class="flex justify-between"><span class="text-slate-500">Pajak ({{ meta.tax_percent }}%)</span><span class="tabular-nums">{{ rupiah(tax) }}</span></div>
+        <div v-if="meta.tax_percent" class="flex justify-between"><span class="text-slate-500">{{ taxLabel(meta) }}</span><span class="tabular-nums">{{ rupiah(tax) }}</span></div>
         <div class="flex items-baseline justify-between pt-1">
           <span class="font-semibold">Total</span>
           <span class="text-2xl font-bold text-brand-700 tabular-nums">{{ rupiah(total) }}</span>

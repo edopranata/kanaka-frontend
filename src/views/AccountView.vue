@@ -314,7 +314,7 @@ onMounted(loadAppInfo)
   <div class="stagger">
     <PageHeader title="Profil Saya" subtitle="Data diri, foto, dan keamanan akun Anda" />
 
-    <div class="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <div class="space-y-3 lg:sticky lg:top-20">
         <!-- Ringkasan profil -->
         <section class="card flex items-center gap-4 p-4 lg:flex-col lg:p-5 lg:text-center">
@@ -501,7 +501,7 @@ onMounted(loadAppInfo)
             </div>
           </div>
 
-          <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <!-- Pintasan terpilih (berurutan) -->
             <div>
               <p class="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Pintasan Anda · {{ shortcutDraft.length }}/{{ MAX_SHORTCUTS }}</p>

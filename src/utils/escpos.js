@@ -1,5 +1,5 @@
 import { encode } from 'uqr'
-import { number, waktu } from './format'
+import { number, taxLabel, waktu } from './format'
 
 /**
  * Penyusun perintah ESC/POS untuk printer thermal (Rongta, Epson, Xprinter, dll.).
@@ -219,7 +219,7 @@ export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl
   doc.separator()
   doc.pair('Subtotal', number(sale.subtotal))
   if (sale.discount) doc.pair('Diskon', `-${number(sale.discount)}`)
-  if (sale.tax) doc.pair('Pajak', number(sale.tax))
+  if (sale.tax) doc.pair(taxLabel(sale), number(sale.tax))
   doc.bold(true).size(1, 2).pair('TOTAL', number(sale.total)).size(1, 1).bold(false)
 
   if (sale.payment_method === 'piutang') {
@@ -236,6 +236,43 @@ export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl
   doc.feed(feed)
   if (cut) doc.cut()
   return doc.build()
+}
+
+/**
+ * Transaksi contoh untuk "Cetak contoh struk" dan pratinjau struk di Pengaturan: 3 barang (satu kena promo).
+ *
+ * @param {{ number?: string, cashier?: string, taxName?: string, taxPercent?: number, credit?: boolean }} options
+ *   credit = bon (bayar nanti) atas nama pelanggan contoh, bukan tunai.
+ */
+export function sampleSale({ number = 'INV-CONTOH-0001', cashier = 'Kasir', taxName = 'PPN', taxPercent = 0, credit = false } = {}) {
+  const items = [
+    { id: 1, product_name: 'Indomie Goreng', unit: 'PCS', qty: 2, price: 3500, discount: 0 },
+    { id: 2, product_name: 'Kopi Kapal Api Special Mix 25 gr', unit: 'SACHET', qty: 3, price: 2000, discount: 600, promo: 'Promo Kopi' },
+    { id: 3, product_name: 'Aqua 600ml', unit: 'BTL', qty: 1, price: 4000, discount: 0 },
+  ]
+  const subtotal = items.reduce((sum, item) => sum + item.qty * item.price - item.discount, 0)
+  const tax = Math.round((subtotal * (Number(taxPercent) || 0)) / 100)
+  const total = subtotal + tax
+  const paid = credit ? 0 : Math.ceil(total / 10000) * 10000
+  return {
+    number,
+    created_at: new Date().toISOString(),
+    cashier,
+    customer: credit ? { name: 'Budi Santoso' } : null,
+    items,
+    subtotal,
+    discount: 0,
+    tax,
+    tax_name: tax ? taxName : null,
+    tax_percent: tax ? Number(taxPercent) : null,
+    total,
+    payment_method: credit ? 'piutang' : 'tunai',
+    payment_label: credit ? 'Bon' : 'Tunai',
+    paid,
+    change: credit ? 0 : paid - total,
+    status: 'selesai',
+    receipt_token: 'CONTOH',
+  }
 }
 
 /** Halaman tes printer: lebar kolom, perataan, huruf tebal/besar, dan contoh baris struk. */

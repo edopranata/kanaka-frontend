@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah } from '../utils/format'
+import { number, rupiah, taxLabel } from '../utils/format'
 import { printReceipt } from '../utils/print'
 import { printerConfig } from '../utils/printer'
 import { bestPromo } from '../utils/discount'
@@ -146,7 +146,7 @@ onMounted(() => {
     <PageHeader title="Bon Baru" subtitle="Penjualan kredit: barang diambil sekarang, dibayar lewat tagihan bulanan" :back="{ name: 'credit-sales' }" />
     <PrinterStatus class="mb-4 rounded-xl" />
 
-    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Pelanggan</label>
@@ -233,7 +233,7 @@ onMounted(() => {
         <div class="space-y-2 border-t border-slate-200 p-4 text-sm">
           <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span class="tabular-nums">{{ rupiah(grossTotal) }}</span></div>
           <div v-if="grossTotal !== subtotal" class="flex justify-between text-rose-700"><span>Hemat promo</span><span class="tabular-nums">−{{ rupiah(grossTotal - subtotal) }}</span></div>
-          <div v-if="meta.tax_percent" class="flex justify-between"><span class="text-slate-500">Pajak ({{ meta.tax_percent }}%)</span><span class="tabular-nums">{{ rupiah(tax) }}</span></div>
+          <div v-if="meta.tax_percent" class="flex justify-between"><span class="text-slate-500">{{ taxLabel(meta) }}</span><span class="tabular-nums">{{ rupiah(tax) }}</span></div>
           <div class="flex items-baseline justify-between"><span class="font-semibold">Total bon</span><span class="text-xl font-bold text-brand-700 tabular-nums">{{ rupiah(total) }}</span></div>
           <p v-if="overLimit" class="rounded-lg bg-red-50 px-3 py-2 text-red-700">Total bon melebihi sisa limit kredit pelanggan.</p>
           <div class="flex justify-end gap-2 pt-2">

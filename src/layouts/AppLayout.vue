@@ -413,7 +413,8 @@ onBeforeUnmount(() => {
     </div>
     </Transition>
 
-    <main class="print:p-0" :class="fullWidth ? 'px-3 py-3 sm:px-4 lg:px-5' : 'px-4 py-5 sm:px-6 lg:px-8 lg:py-7 2xl:px-10'">
+    <!-- isolate: z-index apa pun di dalam halaman (kartu aktif, dropdown, header tabel sticky) tetap di bawah top bar. -->
+    <main class="isolate print:p-0" :class="fullWidth ? 'px-3 py-3 sm:px-4 lg:px-5' : 'px-4 py-5 sm:px-6 lg:px-8 lg:py-7 2xl:px-10'">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
           <component :is="Component" :key="route.fullPath" />

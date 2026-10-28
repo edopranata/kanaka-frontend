@@ -488,9 +488,9 @@ onMounted(async () => {
     <AppModal v-if="adjust" :title="`Penyesuaian ${adjust.account.name}`" @close="adjust = null">
       <form id="adjust-form" class="space-y-3" @submit.prevent="submitAdjust">
         <p class="text-sm text-slate-600">Saldo saat ini <b class="tabular-nums">{{ rupiah(adjust.account.balance) }}</b>. Gunakan untuk saldo awal rekening atau koreksi.</p>
-        <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-          <button type="button" class="tab justify-center" :class="{ 'tab-active': adjust.direction === 1 }" @click="adjust.direction = 1">Tambah</button>
-          <button type="button" class="tab justify-center" :class="{ 'tab-active': adjust.direction === -1 }" @click="adjust.direction = -1">Kurangi</button>
+        <div class="segmented">
+          <button type="button" class="tab" :class="{ 'tab-active': adjust.direction === 1 }" @click="adjust.direction = 1">Tambah</button>
+          <button type="button" class="tab" :class="{ 'tab-active': adjust.direction === -1 }" @click="adjust.direction = -1">Kurangi</button>
         </div>
         <div>
           <label class="label">Jumlah</label>

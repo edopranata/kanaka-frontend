@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import http from '../api/http'
 import { footerLines, headerLines, promoLabel } from '../utils/escpos'
-import { number, rupiah, waktu } from '../utils/format'
+import { number, rupiah, taxLabel, waktu } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 
 /**
@@ -76,7 +76,7 @@ onMounted(async () => {
       <dl class="space-y-0.5">
         <div class="flex justify-between"><dt>Subtotal</dt><dd>{{ number(sale.subtotal) }}</dd></div>
         <div v-if="sale.discount" class="flex justify-between"><dt>Diskon</dt><dd>-{{ number(sale.discount) }}</dd></div>
-        <div v-if="sale.tax" class="flex justify-between"><dt>Pajak</dt><dd>{{ number(sale.tax) }}</dd></div>
+        <div v-if="sale.tax" class="flex justify-between"><dt>{{ taxLabel(sale) }}</dt><dd>{{ number(sale.tax) }}</dd></div>
         <div class="flex justify-between pt-1 font-sans text-base font-bold text-slate-900"><dt>TOTAL</dt><dd>{{ rupiah(sale.total) }}</dd></div>
         <template v-if="sale.payment_method === 'piutang'">
           <p class="pt-2 text-center font-bold">BON — BAYAR NANTI</p>

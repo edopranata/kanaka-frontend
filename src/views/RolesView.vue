@@ -307,7 +307,7 @@ onMounted(load)
     </div>
 
     <AppModal v-if="form" :title="form.is_system ? `Role ${form.name}` : form.id ? 'Ubah Role' : 'Role Baru'" size="2xl" fixed-body maximizable="role-form" @close="form = null">
-      <form id="role-form" class="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]" @submit.prevent="save">
+      <form id="role-form" class="grid grid-cols-1 gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]" @submit.prevent="save">
         <div class="min-w-0 space-y-3">
           <div>
             <label class="label">Nama role / jabatan</label>

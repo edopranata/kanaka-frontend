@@ -9,6 +9,10 @@ import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppSelect from '../components/AppSelect.vue'
 import NumberInput from '../components/NumberInput.vue'
+import ReceiptPreview from '../components/ReceiptPreview.vue'
+import { columnsFor, receiptBytes, sampleSale } from '../utils/escpos'
+import { taxLabel } from '../utils/format'
+import { printerConfig } from '../utils/printer'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -26,44 +30,31 @@ const FOOTER_LINES = 6
 const FOOTER_WIDTH = 32
 const footer = ref([])
 watch(footer, (lines) => form.value && 'receipt_footer' in form.value && (form.value.receipt_footer = lines.join('\n')), { deep: true })
-const footerPreview = computed(() => {
-  const lines = footer.value.map((line) => line.trim()).filter(Boolean)
-  return ['-'.repeat(FOOTER_WIDTH), ...lines.map((line) => center(line)), ...(form.value?.receipt_qr ? ['', center('[QR]'), center('Scan untuk struk digital')] : [])].join('\n')
-})
 const setFooter = (text) => (footer.value = String(text || '').split('\n').filter((line) => line !== '') || [])
 
 // Header struk: nama toko, alamat, alamat 2 (opsional), kontak (Telp / Email), lalu jarak ke isi struk.
 const HEADER_WIDTH = 48
 const addressSplit = ref(false)
-const center = (text, width = FOOTER_WIDTH) => ' '.repeat(Math.max(0, Math.floor((width - text.length) / 2))) + text
-/** Lipat teks per kata selebar struk 58 mm (sama seperti cetak ESC/POS). */
-function wrapWords(text, width = FOOTER_WIDTH) {
-  const lines = []
-  let current = ''
-  for (const word of String(text).split(/\s+/).filter(Boolean)) {
-    if (current && (current + ' ' + word).length > width) {
-      lines.push(current)
-      current = ''
-    }
-    current = current ? `${current} ${word}` : word
-    while (current.length > width) {
-      lines.push(current.slice(0, width))
-      current = current.slice(width)
-    }
-  }
-  if (current) lines.push(current)
-  return lines
-}
-// Pratinjau header mengikuti ukuran kertas yang dipilih (58 mm = 32 karakter, 80 mm = 48).
-const headerWidth = computed(() => (form.value?.receipt_paper === '80' ? 48 : FOOTER_WIDTH))
-const headerPreview = computed(() => {
+
+// Pratinjau struk utuh: transaksi contoh dicetak lewat perintah ESC/POS yang sama dengan printer, memakai isian
+// yang belum disimpan. Kertas mengikuti "Ukuran kertas struk" (bawaan untuk perangkat tanpa pengaturan printer).
+const previewKind = ref('tunai')
+const previewColumns = computed(() => columnsFor(form.value?.receipt_paper))
+const previewBytes = computed(() => {
   const f = form.value
-  if (!f) return ''
-  const width = headerWidth.value
+  if (!f) return new Uint8Array()
   const contact = f.receipt_contact === 'email' ? (f.store_email ? `Email: ${f.store_email}` : '') : f.store_phone ? `Telp. ${f.store_phone}` : ''
-  const lines = [f.store_name, f.store_address, f.store_address2, contact].filter((line) => String(line || '').trim())
-  return [...lines.flatMap((line) => wrapWords(line, width).map((part) => center(part, width))), ...Array(Number(f.receipt_header_gap) || 1).fill(''), '-'.repeat(width), 'No   : INV-20261027-0001'].join('\n')
+  const store = { name: f.store_name, address: f.store_address, address2: f.store_address2, contact, header_gap: f.receipt_header_gap, receipt_footer: footer.value.join('\n') }
+  const sale = sampleSale({
+    number: docPreview(f.prefix_sale || 'INV'),
+    cashier: auth.user?.name || 'Kasir',
+    taxName: f.tax_name ?? meta.tax_name,
+    taxPercent: f.tax_percent ?? meta.tax_percent,
+    credit: previewKind.value === 'bon',
+  })
+  return receiptBytes(sale, { store, columns: previewColumns.value, feed: printerConfig.feed, cut: printerConfig.cut, qrUrl: f.receipt_qr ? `${window.location.origin}/s/CONTOH` : null, qrSize: printerConfig.qrSize })
 })
+
 /**
  * Alamat lama (satu baris panjang) dipecah menjadi Alamat + Alamat 2, utamakan setelah tanda baca yang
  * paling dekat ke tengah. Tersimpan setelah klik Simpan.
@@ -131,7 +122,7 @@ const errorTabs = computed(() => {
     app: ['app_name', 'app_tagline', 'report_'],
     store: ['store_', 'receipt_'],
     numbering: ['prefix_', 'doc_number', 'sku_', 'package_sku'],
-    transaction: ['tax_percent', 'default_', 'package_default', 'expense_categories', 'allow_negative'],
+    transaction: ['tax_', 'default_', 'package_default', 'expense_categories', 'allow_negative'],
     closing: ['auto_closing', 'auto_billing', 'bill_due_days', 'cash_account_'],
     security: ['temp_password'],
     maintenance: ['retention_'],
@@ -238,7 +229,7 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <div v-if="form" class="grid gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
+    <div v-if="form" class="grid grid-cols-1 gap-5 lg:grid-cols-[14rem_minmax(0,1fr)]">
       <!-- Navigasi tab -->
       <nav class="flex gap-1 overflow-x-auto rounded-xl bg-slate-200/60 p-1 lg:flex-col lg:self-start lg:bg-transparent lg:p-0">
         <button
@@ -282,15 +273,15 @@ onMounted(async () => {
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
                 <label class="label">Ukuran kertas</label>
-                <div class="grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
-                  <button v-for="paper in ['A4', 'F4', 'Letter', 'Legal']" :key="paper" type="button" class="tab justify-center" :class="{ 'tab-active': form.report_paper === paper }" @click="form.report_paper = paper">{{ paper }}</button>
+                <div class="segmented">
+                  <button v-for="paper in ['A4', 'F4', 'Letter', 'Legal']" :key="paper" type="button" class="tab" :class="{ 'tab-active': form.report_paper === paper }" @click="form.report_paper = paper">{{ paper }}</button>
                 </div>
                 <p class="mt-1 text-xs text-slate-500">{{ { A4: 'A4 · 210 × 297 mm', F4: 'F4 / Folio · 215 × 330 mm', Letter: 'Letter · 216 × 279 mm', Legal: 'Legal · 216 × 356 mm' }[form.report_paper] }}</p>
               </div>
               <div>
                 <label class="label">Orientasi</label>
-                <div class="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
-                  <button v-for="(label, value) in { auto: 'Otomatis', portrait: 'Portrait', landscape: 'Landscape' }" :key="value" type="button" class="tab justify-center" :class="{ 'tab-active': form.report_orientation === value }" @click="form.report_orientation = value">{{ label }}</button>
+                <div class="segmented">
+                  <button v-for="(label, value) in { auto: 'Otomatis', portrait: 'Portrait', landscape: 'Landscape' }" :key="value" type="button" class="tab" :class="{ 'tab-active': form.report_orientation === value }" @click="form.report_orientation = value">{{ label }}</button>
                 </div>
                 <p class="mt-1 text-xs text-slate-500">Otomatis: landscape bila kolom laporan terlalu lebar untuk portrait.</p>
               </div>
@@ -298,97 +289,101 @@ onMounted(async () => {
           </section>
 
           <!-- Toko & struk -->
-          <section v-else-if="tab === 'store'" key="store" class="card space-y-4 p-5">
-            <h2 class="font-semibold">Identitas toko & struk</h2>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="sm:col-span-2">
-                <p class="label">Header struk</p>
-                <div class="grid gap-3" :class="headerWidth > FOOTER_WIDTH ? 'xl:grid-cols-[minmax(0,1fr)_22rem]' : 'lg:grid-cols-[minmax(0,1fr)_16rem]'">
-                  <div class="space-y-3">
-                    <div>
-                      <label class="mb-1 block text-xs font-medium text-slate-500">Baris 1 · Nama toko</label>
-                      <input v-model="form.store_name" class="input" :class="{ 'input-error': errors.store_name }" maxlength="100" required />
-                      <p v-if="errors.store_name" class="error-text">{{ errors.store_name }}</p>
-                    </div>
-                    <div v-for="field in [{ key: 'store_address', label: 'Baris 2 · Alamat', placeholder: 'mis. Jl. Jend. Sudirman No 12' }, { key: 'store_address2', label: 'Baris 3 · Alamat 2 (opsional)', placeholder: 'mis. Pekanbaru, Riau' }]" :key="field.key">
-                      <label class="mb-1 block text-xs font-medium text-slate-500">{{ field.label }}</label>
-                      <div class="relative">
-                        <input v-model="form[field.key]" class="input pr-14" :class="{ 'input-error': errors[field.key] }" :maxlength="HEADER_WIDTH" :placeholder="field.placeholder" />
-                        <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs tabular-nums" :class="(form[field.key] || '').length > FOOTER_WIDTH ? 'text-amber-600' : 'text-slate-400'">{{ (form[field.key] || '').length }}/{{ FOOTER_WIDTH }}</span>
-                      </div>
-                      <p v-if="errors[field.key]" class="error-text">{{ errors[field.key] }}</p>
-                    </div>
-                    <p v-if="addressSplit" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Alamat lama terlalu panjang untuk satu baris, sudah dipecah otomatis menjadi Alamat &amp; Alamat 2. Periksa lalu klik Simpan.</p>
-                    <div>
-                      <p class="mb-1 block text-xs font-medium text-slate-500">Baris terakhir · Kontak yang dicetak</p>
-                      <div class="mb-2 grid max-w-xs grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-                        <button type="button" class="tab justify-center" :class="{ 'tab-active': form.receipt_contact === 'phone' }" @click="form.receipt_contact = 'phone'">Telp</button>
-                        <button type="button" class="tab justify-center" :class="{ 'tab-active': form.receipt_contact === 'email' }" @click="form.receipt_contact = 'email'">Email</button>
-                      </div>
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        <div>
-                          <input v-model="form.store_phone" class="input" :class="{ 'input-error': errors.store_phone, 'ring-1 ring-brand-300': form.receipt_contact === 'phone' }" maxlength="30" placeholder="Telepon, mis. 0812-3456-7890" />
-                          <p v-if="errors.store_phone" class="error-text">{{ errors.store_phone }}</p>
-                        </div>
-                        <div>
-                          <input v-model="form.store_email" type="email" class="input" :class="{ 'input-error': errors.store_email, 'ring-1 ring-brand-300': form.receipt_contact === 'email' }" maxlength="100" placeholder="Email, mis. toko@contoh.id" />
-                          <p v-if="errors.store_email" class="error-text">{{ errors.store_email }}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <p class="mb-1 block text-xs font-medium text-slate-500">Jarak header ke isi struk</p>
-                      <div class="grid max-w-xs grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
-                        <button v-for="gap in [1, 2, 3]" :key="gap" type="button" class="tab justify-center" :class="{ 'tab-active': Number(form.receipt_header_gap) === gap }" @click="form.receipt_header_gap = gap">{{ gap }} baris</button>
-                      </div>
-                    </div>
-                    <p class="text-xs text-slate-500">Alamat maks. {{ HEADER_WIDTH }} karakter per baris; lebih dari {{ FOOTER_WIDTH }} karakter akan dilipat menjadi 2 baris di kertas 58 mm. Kontak kosong tidak dicetak.</p>
+          <section v-else-if="tab === 'store'" key="store" class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_auto]">
+            <div class="card space-y-5 p-5">
+              <h2 class="font-semibold">Identitas toko & struk</h2>
+              <div class="space-y-3">
+                <p class="label mb-0">Header struk</p>
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-slate-500">Baris 1 · Nama toko</label>
+                  <input v-model="form.store_name" class="input" :class="{ 'input-error': errors.store_name }" maxlength="100" required />
+                  <p v-if="errors.store_name" class="error-text">{{ errors.store_name }}</p>
+                </div>
+                <div v-for="field in [{ key: 'store_address', label: 'Baris 2 · Alamat', placeholder: 'mis. Jl. Jend. Sudirman No 12' }, { key: 'store_address2', label: 'Baris 3 · Alamat 2 (opsional)', placeholder: 'mis. Pekanbaru, Riau' }]" :key="field.key">
+                  <label class="mb-1 block text-xs font-medium text-slate-500">{{ field.label }}</label>
+                  <div class="relative">
+                    <input v-model="form[field.key]" class="input pr-14" :class="{ 'input-error': errors[field.key] }" :maxlength="HEADER_WIDTH" :placeholder="field.placeholder" />
+                    <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs tabular-nums" :class="(form[field.key] || '').length > FOOTER_WIDTH ? 'text-amber-600' : 'text-slate-400'">{{ (form[field.key] || '').length }}/{{ FOOTER_WIDTH }}</span>
                   </div>
-                  <div>
-                    <p class="mb-1 text-xs text-slate-500">Pratinjau ({{ form.receipt_paper }} mm)</p>
-                    <pre class="overflow-x-auto rounded-lg border border-dashed border-slate-300 bg-white p-2 font-mono text-[11px] leading-snug text-slate-700">{{ headerPreview }}</pre>
+                  <p v-if="errors[field.key]" class="error-text">{{ errors[field.key] }}</p>
+                </div>
+                <p v-if="addressSplit" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Alamat lama terlalu panjang untuk satu baris, sudah dipecah otomatis menjadi Alamat &amp; Alamat 2. Periksa lalu klik Simpan.</p>
+                <div>
+                  <p class="mb-1 block text-xs font-medium text-slate-500">Baris terakhir · Kontak yang dicetak</p>
+                  <div class="segmented mb-2 max-w-xs">
+                    <button type="button" class="tab" :class="{ 'tab-active': form.receipt_contact === 'phone' }" @click="form.receipt_contact = 'phone'">Telp</button>
+                    <button type="button" class="tab" :class="{ 'tab-active': form.receipt_contact === 'email' }" @click="form.receipt_contact = 'email'">Email</button>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <input v-model="form.store_phone" class="input" :class="{ 'input-error': errors.store_phone, 'ring-1 ring-brand-300': form.receipt_contact === 'phone' }" maxlength="30" placeholder="Telepon, mis. 0812-3456-7890" />
+                      <p v-if="errors.store_phone" class="error-text">{{ errors.store_phone }}</p>
+                    </div>
+                    <div>
+                      <input v-model="form.store_email" type="email" class="input" :class="{ 'input-error': errors.store_email, 'ring-1 ring-brand-300': form.receipt_contact === 'email' }" maxlength="100" placeholder="Email, mis. toko@contoh.id" />
+                      <p v-if="errors.store_email" class="error-text">{{ errors.store_email }}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="sm:col-span-2">
-                <label class="label">Catatan kaki struk</label>
-                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
-                  <div class="space-y-2">
-                    <div v-for="(line, index) in footer" :key="index" class="flex items-center gap-2">
-                      <span class="w-5 shrink-0 text-right text-xs text-slate-400">{{ index + 1 }}</span>
-                      <div class="relative min-w-0 flex-1">
-                        <input v-model="footer[index]" class="input pr-14" :maxlength="FOOTER_WIDTH" placeholder="mis. Terima kasih atas kunjungan Anda" />
-                        <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs tabular-nums" :class="line.length >= FOOTER_WIDTH ? 'text-amber-600' : 'text-slate-400'">{{ line.length }}/{{ FOOTER_WIDTH }}</span>
-                      </div>
-                      <button type="button" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus baris" @click="footer.splice(index, 1)"><AppIcon name="trash" :size="16" /></button>
-                    </div>
-                    <button type="button" class="btn-secondary btn-sm" :disabled="footer.length >= FOOTER_LINES" @click="footer.push('')">
-                      <AppIcon name="plus" :size="14" /> Tambah baris
-                    </button>
-                    <p class="text-xs text-slate-500">Maks. {{ FOOTER_LINES }} baris × {{ FOOTER_WIDTH }} karakter (lebar struk 58 mm). Baris kosong diabaikan.</p>
-                    <p v-if="errors.receipt_footer" class="error-text">{{ errors.receipt_footer }}</p>
-                  </div>
-                  <div>
-                    <p class="mb-1 text-xs text-slate-500">Pratinjau (58 mm)</p>
-                    <pre class="rounded-lg border border-dashed border-slate-300 bg-white p-2 font-mono text-[11px] leading-snug text-slate-700">{{ footerPreview }}</pre>
+                <div>
+                  <p class="mb-1 block text-xs font-medium text-slate-500">Jarak header ke isi struk</p>
+                  <div class="segmented max-w-xs">
+                    <button v-for="gap in [1, 2, 3]" :key="gap" type="button" class="tab" :class="{ 'tab-active': Number(form.receipt_header_gap) === gap }" @click="form.receipt_header_gap = gap">{{ gap }} baris</button>
                   </div>
                 </div>
+                <p class="text-xs text-slate-500">Alamat maks. {{ HEADER_WIDTH }} karakter per baris; lebih dari {{ FOOTER_WIDTH }} karakter akan dilipat menjadi 2 baris di kertas 58 mm. Kontak kosong tidak dicetak.</p>
               </div>
-              <label class="flex items-start gap-3 sm:col-span-2">
-                <input v-model="form.receipt_qr" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
-                <span>
-                  <span class="block text-sm font-medium">Tampilkan QR struk digital</span>
-                  <span class="block text-xs text-slate-500">QR di bawah struk; pembeli scan untuk membuka struk ini secara online (tanpa login).</span>
-                </span>
-              </label>
-              <div>
-                <label class="label">Ukuran kertas struk</label>
-                <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-                  <button type="button" class="tab justify-center" :class="{ 'tab-active': form.receipt_paper === '58' }" @click="form.receipt_paper = '58'">58 mm</button>
-                  <button type="button" class="tab justify-center" :class="{ 'tab-active': form.receipt_paper === '80' }" @click="form.receipt_paper = '80'">80 mm</button>
+
+              <div class="space-y-2 border-t border-slate-100 pt-5">
+                <label class="label mb-0">Catatan kaki struk</label>
+                <div v-for="(line, index) in footer" :key="index" class="flex items-center gap-2">
+                  <span class="w-5 shrink-0 text-right text-xs text-slate-400">{{ index + 1 }}</span>
+                  <div class="relative min-w-0 flex-1">
+                    <input v-model="footer[index]" class="input pr-14" :maxlength="FOOTER_WIDTH" placeholder="mis. Terima kasih atas kunjungan Anda" />
+                    <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs tabular-nums" :class="line.length >= FOOTER_WIDTH ? 'text-amber-600' : 'text-slate-400'">{{ line.length }}/{{ FOOTER_WIDTH }}</span>
+                  </div>
+                  <button type="button" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus baris" @click="footer.splice(index, 1)"><AppIcon name="trash" :size="16" /></button>
+                </div>
+                <button type="button" class="btn-secondary btn-sm" :disabled="footer.length >= FOOTER_LINES" @click="footer.push('')">
+                  <AppIcon name="plus" :size="14" /> Tambah baris
+                </button>
+                <p class="text-xs text-slate-500">Maks. {{ FOOTER_LINES }} baris × {{ FOOTER_WIDTH }} karakter (lebar struk 58 mm). Baris kosong diabaikan.</p>
+                <p v-if="errors.receipt_footer" class="error-text">{{ errors.receipt_footer }}</p>
+              </div>
+
+              <div class="grid gap-5 border-t border-slate-100 pt-5 md:grid-cols-2">
+                <label class="flex items-start gap-3">
+                  <input v-model="form.receipt_qr" type="checkbox" class="mt-0.5" />
+                  <span>
+                    <span class="block text-sm font-medium">Tampilkan QR struk digital</span>
+                    <span class="block text-xs text-slate-500">QR di bawah struk; pembeli scan untuk membuka struk ini secara online (tanpa login).</span>
+                  </span>
+                </label>
+                <div>
+                  <label class="label">Ukuran kertas struk</label>
+                  <div class="segmented">
+                    <button type="button" class="tab" :class="{ 'tab-active': form.receipt_paper === '58' }" @click="form.receipt_paper = '58'">58 mm</button>
+                    <button type="button" class="tab" :class="{ 'tab-active': form.receipt_paper === '80' }" @click="form.receipt_paper = '80'">80 mm</button>
+                  </div>
+                  <p class="mt-1 text-xs text-slate-500">Bawaan untuk semua perangkat; bisa diganti per perangkat di halaman Printer.</p>
                 </div>
               </div>
             </div>
+
+            <aside class="card space-y-3 p-4 xl:sticky xl:top-20 xl:w-[27rem]">
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="font-semibold">Pratinjau struk</h2>
+                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 tabular-nums">{{ form.receipt_paper }} mm · {{ previewColumns }} karakter</span>
+              </div>
+              <div class="segmented">
+                <button type="button" class="tab" :class="{ 'tab-active': previewKind === 'tunai' }" @click="previewKind = 'tunai'">Contoh tunai</button>
+                <button type="button" class="tab" :class="{ 'tab-active': previewKind === 'bon' }" @click="previewKind = 'bon'">Contoh bon</button>
+              </div>
+              <div class="rounded-lg bg-slate-100 px-3 py-5">
+                <ReceiptPreview :bytes="previewBytes" :columns="previewColumns" />
+              </div>
+              <p class="text-xs text-slate-500">Transaksi contoh, langsung mengikuti isian sebelum disimpan. Tampilan sama dengan cetakan printer thermal; jarak feed &amp; garis potong mengikuti pengaturan printer perangkat ini.</p>
+            </aside>
           </section>
 
           <!-- Penomoran & kode -->
@@ -462,9 +457,15 @@ onMounted(async () => {
             <h2 class="font-semibold">Transaksi & stok</h2>
             <div class="grid gap-4 sm:grid-cols-2">
               <div>
-                <label class="label">Pajak penjualan (%)</label>
-                <NumberInput v-model="form.tax_percent" :min="0" :max="100" :step="0.01" suffix="%" :invalid="!!errors.tax_percent" />
-                <p class="mt-1 text-xs text-slate-500">Isi 0 jika tidak memungut pajak (mis. PPN 11).</p>
+                <label class="label" for="tax-name">Pajak penjualan</label>
+                <div class="flex gap-2">
+                  <input id="tax-name" v-model="form.tax_name" class="input w-28 shrink-0" :class="{ 'input-error': errors.tax_name }" maxlength="12" placeholder="PPN" title="Nama pajak" />
+                  <NumberInput v-model="form.tax_percent" class="min-w-0 flex-1" :min="0" :max="100" :step="0.01" suffix="%" :invalid="!!errors.tax_percent" aria-label="Tarif pajak" />
+                </div>
+                <p v-if="errors.tax_name || errors.tax_percent" class="error-text">{{ errors.tax_name || errors.tax_percent }}</p>
+                <p class="mt-1 text-xs text-slate-500">
+                  Tampil di kasir & struk sebagai <b>{{ taxLabel(form) }}</b>. Isi 0% jika tidak memungut pajak. Transaksi yang sudah ada tetap memakai tarif saat itu.
+                </p>
               </div>
 
               <div>

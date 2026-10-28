@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { columnsFor, receiptBytes, testPageBytes } from '../utils/escpos'
+import { columnsFor, receiptBytes, sampleSale, testPageBytes } from '../utils/escpos'
 import { printWithBrowser, receiptPaper, receiptUrl } from '../utils/print'
 import { choosePrinter, disconnect, forgetPrinter, isDirect, printerConfig, printerState, reconnect, sendBytes, support } from '../utils/printer'
 import AppIcon from './AppIcon.vue'
@@ -42,27 +42,7 @@ const summary = computed(() => [
 ])
 
 // Struk contoh untuk "Cetak contoh struk".
-const sample = computed(() => ({
-  number: 'INV-CONTOH-0001',
-  created_at: new Date().toISOString(),
-  cashier: 'Kasir',
-  customer: null,
-  items: [
-    { id: 1, product_name: 'Indomie Goreng', unit: 'PCS', qty: 2, price: 3500, discount: 0 },
-    { id: 2, product_name: 'Kopi Kapal Api Special Mix 25 gr', unit: 'SACHET', qty: 3, price: 2000, discount: 600, promo: 'Promo Kopi' },
-    { id: 3, product_name: 'Aqua 600ml', unit: 'BTL', qty: 1, price: 4000, discount: 0 },
-  ],
-  subtotal: 16400,
-  discount: 0,
-  tax: 0,
-  total: 16400,
-  payment_method: 'tunai',
-  payment_label: 'Tunai',
-  paid: 20000,
-  change: 3600,
-  status: 'selesai',
-  receipt_token: 'CONTOH',
-}))
+const sample = computed(() => sampleSale())
 const showSample = ref(false)
 
 function setMode(mode) {
@@ -121,7 +101,7 @@ onMounted(() => reconnect())
 
 <template>
   <!-- Layar lebar: pengaturan di kiri, ringkasan & tes cetak menempel di kanan. -->
-  <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
     <div class="min-w-0 space-y-5">
       <section class="card space-y-5 p-5">
         <div class="flex items-start gap-3 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
@@ -197,17 +177,17 @@ onMounted(() => reconnect())
         <div class="grid gap-4 md:grid-cols-2">
           <div>
             <p class="label">Lebar kertas di perangkat ini</p>
-            <div class="flex gap-1 rounded-lg bg-slate-100 p-1">
-              <button type="button" class="tab flex-auto justify-center" :class="{ 'tab-active': !printerConfig.paper }" @click="printerConfig.paper = ''">Bawaan ({{ meta.app.receipt_paper }} mm)</button>
-              <button type="button" class="tab flex-auto justify-center" :class="{ 'tab-active': printerConfig.paper === '58' }" @click="printerConfig.paper = '58'">58 mm</button>
-              <button type="button" class="tab flex-auto justify-center" :class="{ 'tab-active': printerConfig.paper === '80' }" @click="printerConfig.paper = '80'">80 mm</button>
+            <div class="segmented">
+              <button type="button" class="tab" :class="{ 'tab-active': !printerConfig.paper }" @click="printerConfig.paper = ''">Bawaan ({{ meta.app.receipt_paper }} mm)</button>
+              <button type="button" class="tab" :class="{ 'tab-active': printerConfig.paper === '58' }" @click="printerConfig.paper = '58'">58 mm</button>
+              <button type="button" class="tab" :class="{ 'tab-active': printerConfig.paper === '80' }" @click="printerConfig.paper = '80'">80 mm</button>
             </div>
             <p class="mt-1 text-xs text-slate-500">{{ paper }} mm = {{ columns }} karakter per baris. Samakan dengan pengaturan kertas di printer.</p>
           </div>
           <div v-if="meta.app.receipt_qr !== false">
             <p class="label">Ukuran QR struk digital</p>
-            <div class="flex gap-1 rounded-lg bg-slate-100 p-1">
-              <button v-for="(label, value) in { kecil: 'Kecil ±12 mm', sedang: 'Sedang ±17 mm', besar: 'Besar ±21 mm' }" :key="value" type="button" class="tab flex-auto justify-center" :class="{ 'tab-active': printerConfig.qrSize === value }" @click="printerConfig.qrSize = value">{{ label }}</button>
+            <div class="segmented">
+              <button v-for="(label, value) in { kecil: 'Kecil ±12 mm', sedang: 'Sedang ±17 mm', besar: 'Besar ±21 mm' }" :key="value" type="button" class="tab" :class="{ 'tab-active': printerConfig.qrSize === value }" @click="printerConfig.qrSize = value">{{ label }}</button>
             </div>
             <p class="mt-1 text-xs text-slate-500">QR kecil lebih cepat dicetak; pastikan masih bisa di-scan HP pembeli (Tes Print).</p>
           </div>

@@ -1,6 +1,6 @@
 <script setup>
 import { useMetaStore } from '../stores/meta'
-import { number, waktu } from '../utils/format'
+import { number, taxLabel, waktu } from '../utils/format'
 import { computed } from 'vue'
 import { renderSVG } from 'uqr'
 import { footerLines, headerGap, headerLines, promoLabel } from '../utils/escpos'
@@ -49,7 +49,7 @@ const qrSvg = computed(() => {
         <hr />
         <p class="row"><span>Subtotal</span><span>{{ number(sale.subtotal) }}</span></p>
         <p v-if="sale.discount" class="row"><span>Diskon</span><span>-{{ number(sale.discount) }}</span></p>
-        <p v-if="sale.tax" class="row"><span>Pajak</span><span>{{ number(sale.tax) }}</span></p>
+        <p v-if="sale.tax" class="row"><span>{{ taxLabel(sale) }}</span><span>{{ number(sale.tax) }}</span></p>
         <p class="row bold big"><span>TOTAL</span><span>{{ number(sale.total) }}</span></p>
         <template v-if="sale.payment_method === 'piutang'">
           <p class="center bold">*** BON - BAYAR NANTI ***</p>

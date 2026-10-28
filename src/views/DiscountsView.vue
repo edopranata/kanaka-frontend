@@ -221,7 +221,7 @@ onMounted(() => {
 
     <!-- Form promo -->
     <AppModal v-if="form" :title="form.id ? 'Ubah Promo' : 'Promo Baru'" size="xl" @close="form = null">
-      <form id="discount-form" class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]" @submit.prevent="save">
+      <form id="discount-form" class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]" @submit.prevent="save">
         <div class="space-y-3">
           <div>
             <label class="label">Nama promo</label>
@@ -230,9 +230,9 @@ onMounted(() => {
           </div>
           <div>
             <label class="label">Jenis potongan</label>
-            <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-              <button type="button" class="tab justify-center" :class="{ 'tab-active': form.type === 'persen' }" @click="form.type = 'persen'">Persen (%)</button>
-              <button type="button" class="tab justify-center" :class="{ 'tab-active': form.type === 'nominal' }" @click="form.type = 'nominal'">Nominal (Rp)</button>
+            <div class="segmented">
+              <button type="button" class="tab" :class="{ 'tab-active': form.type === 'persen' }" @click="form.type = 'persen'">Persen (%)</button>
+              <button type="button" class="tab" :class="{ 'tab-active': form.type === 'nominal' }" @click="form.type = 'nominal'">Nominal (Rp)</button>
             </div>
           </div>
           <div class="grid gap-3 sm:grid-cols-2">

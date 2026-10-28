@@ -228,7 +228,7 @@ onMounted(() => {
 
     <!-- Modal closing manual -->
     <AppModal v-if="modal" :title="`Closing ${tanggal(status.next_closing_date, 'long')}`" size="xl" @close="modal = false">
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <div class="min-w-0 space-y-3">
           <div>
             <p class="font-semibold text-slate-900">Hitung kas fisik per pengguna</p>

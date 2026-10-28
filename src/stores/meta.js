@@ -11,6 +11,7 @@ export const useMetaStore = defineStore('meta', {
     defaults: { unit: 'PCS', min_stock: 5, package_unit: 'PORSI' },
     store: { name: 'Aplikasi Penjualan', address: '', phone: '', receipt_footer: '' },
     tax_percent: 0,
+    tax_name: 'PPN',
     business_date: null,
     payment_methods: [],
     roles: [],

@@ -80,9 +80,9 @@ Windows (contoh Rongta RPP02N): nyalakan printer → **Settings → Bluetooth & 
 
 ## Pengaturan aplikasi
 
-Menu *Pengaturan Aplikasi* (setiap tab diatur hak aksesnya sendiri, lihat bagian Role & hak akses): nama & slogan aplikasi (tampil di halaman masuk), identitas toko & struk (kertas 58/80 mm),
+Menu *Pengaturan Aplikasi* (setiap tab diatur hak aksesnya sendiri, lihat bagian Role & hak akses): nama & slogan aplikasi (tampil di halaman masuk), identitas toko & struk (kertas 58/80 mm, pratinjau struk utuh),
 prefix setiap dokumen (nota `INV`, bon `BON`, pembelian `PB`, penyesuaian `ADJ`, opname `SO`, tagihan `TG`), periode
-pengulangan nomor urut (harian/bulanan/tahunan) & jumlah digit, prefix SKU, pajak, rekening default per metode non tunai, satuan & stok minimum
+pengulangan nomor urut (harian/bulanan/tahunan) & jumlah digit, prefix SKU, pajak (nama & tarif, mis. "PPN 11%"; tarif tersimpan per transaksi), rekening default per metode non tunai, satuan & stok minimum
 bawaan, stok minus, closing otomatis, serta tagihan otomatis & jatuh tempo.
 
 ## Import master produk dari Excel

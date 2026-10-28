@@ -13,6 +13,7 @@ import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import AppSelect from '../components/AppSelect.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -145,12 +146,19 @@ async function submitTransfer() {
 async function act(item, action) {
   let body = {}
   if (action === 'reject') {
-    const reason = prompt('Alasan menolak (opsional):', 'Uang belum diterima')
+    const from = item.from.name.replace(/^Kas /, '')
+    const reason = await confirmDialog({
+      title: 'Tolak serah terima kas',
+      message: `Tolak kas ${rupiah(item.amount)} dari ${from}?`,
+      input: { label: 'Alasan menolak (opsional)', value: 'Uang belum diterima' },
+      confirmLabel: 'Tolak',
+      tone: 'danger',
+    })
     if (reason === null) return
     body = { reason }
-  } else if (action === 'accept' && !confirm(`Terima kas ${rupiah(item.amount)} dari ${item.from.name.replace(/^Kas /, '')}?\nPastikan uangnya sudah Anda pegang.`)) {
+  } else if (action === 'accept' && !(await confirmDialog({ title: 'Terima serah terima kas', message: `Terima kas ${rupiah(item.amount)} dari ${item.from.name.replace(/^Kas /, '')}?\nPastikan uangnya sudah Anda pegang.`, confirmLabel: 'Terima', icon: 'handover' }))) {
     return
-  } else if (action === 'cancel' && !confirm(`Batalkan serah terima ${item.number}?`)) {
+  } else if (action === 'cancel' && !(await confirmDialog({ title: 'Batalkan serah terima', message: `Batalkan serah terima ${item.number}?`, confirmLabel: 'Batalkan serah terima', cancelLabel: 'Kembali', tone: 'danger' }))) {
     return
   }
   try {

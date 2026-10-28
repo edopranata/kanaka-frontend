@@ -1,4 +1,5 @@
 <script setup>
+import ConfirmDialog from './components/ConfirmDialog.vue'
 import LoadingBar from './components/LoadingBar.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import UpdatePrompt from './components/UpdatePrompt.vue'
@@ -13,4 +14,5 @@ import UpdatePrompt from './components/UpdatePrompt.vue'
   </RouterView>
   <ToastContainer />
   <UpdatePrompt />
+  <ConfirmDialog />
 </template>

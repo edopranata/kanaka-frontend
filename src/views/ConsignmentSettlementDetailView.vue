@@ -13,6 +13,7 @@ import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -57,7 +58,7 @@ async function pay() {
 }
 
 async function cancelPayment(payment) {
-  if (!confirm(`Batalkan pembayaran ${rupiah(payment.amount)}?`)) return
+  if (!(await confirmDialog({ title: 'Batalkan pembayaran', message: `Batalkan pembayaran ${rupiah(payment.amount)}?`, confirmLabel: 'Batalkan pembayaran', cancelLabel: 'Kembali', tone: 'danger' }))) return
   try {
     const { data } = await http.delete(`/consignments/settlements/${settlement.value.id}/payments/${payment.id}`)
     settlement.value = data.data
@@ -68,7 +69,7 @@ async function cancelPayment(payment) {
 }
 
 async function cancelSettlement() {
-  if (!confirm('Batalkan penyelesaian ini? Stok dan titipan terbuka dikembalikan seperti sebelum penyelesaian.')) return
+  if (!(await confirmDialog({ title: 'Batalkan penyelesaian', message: 'Batalkan penyelesaian ini? Stok dan titipan terbuka dikembalikan seperti sebelum penyelesaian.', confirmLabel: 'Batalkan penyelesaian', cancelLabel: 'Kembali', tone: 'danger' }))) return
   try {
     await http.delete(`/consignments/settlements/${settlement.value.id}`)
     toast.success('Penyelesaian dibatalkan.')

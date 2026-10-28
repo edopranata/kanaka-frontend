@@ -13,6 +13,7 @@ import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -88,7 +89,13 @@ async function submit() {
   const message = difference.value === 0
     ? 'Semua kas sesuai. Lanjutkan closing?'
     : `Total selisih kas ${rupiah(difference.value)}. Selisih akan dibukukan ke kas masing-masing. Tetap lanjutkan?`
-  if (!confirm(`${message}\n\nSaldo tiap kas menjadi saldo awal hari berikutnya. Setelah closing, transaksi tanggal ${tanggal(status.value.next_closing_date)} terkunci.`)) return
+  if (!(await confirmDialog({
+    title: `Closing ${tanggal(status.value.next_closing_date)}`,
+    message: `${message}\n\nSaldo tiap kas menjadi saldo awal hari berikutnya. Setelah closing, transaksi tanggal ${tanggal(status.value.next_closing_date)} terkunci.`,
+    confirmLabel: 'Closing sekarang',
+    tone: difference.value === 0 ? 'primary' : 'warning',
+    icon: difference.value === 0 ? 'lock' : 'alert',
+  }))) return
 
   saving.value = true
   errors.value = {}

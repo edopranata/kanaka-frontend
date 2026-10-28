@@ -17,6 +17,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import DateInput from '../components/DateInput.vue'
 import NumberInput from '../components/NumberInput.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -142,7 +143,7 @@ async function toggle(discount) {
 }
 
 async function remove(discount) {
-  if (!confirm(`Hapus promo ${discount.name}?`)) return
+  if (!(await confirmDialog({ title: 'Hapus promo', message: `Hapus promo ${discount.name}?`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   try {
     await http.delete(`/discounts/${discount.id}`)
     toast.success('Promo dihapus.')

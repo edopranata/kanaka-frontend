@@ -10,6 +10,7 @@ import AppIcon from '../components/AppIcon.vue'
 import InstallPrompt from '../components/InstallPrompt.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { MAX_SHORTCUTS, MENU, shortcutOption } from '../utils/menu'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -120,7 +121,7 @@ const closeUserMenuOnEscape = (event) => event.key === 'Escape' && (userMenuOpen
 const fullWidth = computed(() => route.meta.fullWidth)
 
 async function logout() {
-  if (!confirm('Keluar dari aplikasi?')) return
+  if (!(await confirmDialog({ title: 'Keluar', message: 'Keluar dari aplikasi?', confirmLabel: 'Keluar', icon: 'logout' }))) return
   await auth.logout().catch(() => {})
   router.replace({ name: 'login' })
 }

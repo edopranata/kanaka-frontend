@@ -13,6 +13,7 @@ import AppModal from '../components/AppModal.vue'
 import AvatarCropper from '../components/AvatarCropper.vue'
 import PageHeader from '../components/PageHeader.vue'
 import UserAvatar from '../components/UserAvatar.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -91,7 +92,7 @@ async function uploadPhoto() {
 }
 
 async function removePhoto() {
-  if (!confirm('Hapus foto profil?')) return
+  if (!(await confirmDialog({ title: 'Hapus foto profil', message: 'Hapus foto profil? Inisial nama akan tampil sebagai gantinya.', confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   avatarBusy.value = true
   try {
     const { data } = await http.delete('/auth/profile/avatar')
@@ -201,7 +202,7 @@ async function linkGoogle(credential) {
 }
 
 async function unlinkGoogle() {
-  if (!confirm(`Lepas tautan akun Google ${auth.user.google_email}? Anda tidak bisa lagi masuk dengan Google sampai ditautkan ulang.`)) return
+  if (!(await confirmDialog({ title: 'Lepas tautan Google', message: `Lepas tautan akun Google ${auth.user.google_email}? Anda tidak bisa lagi masuk dengan Google sampai ditautkan ulang.`, confirmLabel: 'Lepas tautan', tone: 'danger' }))) return
   try {
     const { data } = await http.delete('/auth/google/link')
     auth.user = { ...auth.user, ...data.data }

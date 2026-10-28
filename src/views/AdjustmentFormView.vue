@@ -10,6 +10,7 @@ import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import DateInput from '../components/DateInput.vue'
 import { useAuthStore } from '../stores/auth'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 // Masuk / keluar butuh stock.adjust, opname butuh stock.opname.
@@ -83,7 +84,7 @@ async function save() {
     toast.error('Tambahkan minimal satu barang.')
     return
   }
-  if (isOpname.value && !confirm('Stok sistem akan disamakan dengan hasil hitung fisik. Lanjutkan?')) return
+  if (isOpname.value && !(await confirmDialog({ title: 'Simpan stok opname', message: 'Stok sistem akan disamakan dengan hasil hitung fisik. Lanjutkan?', confirmLabel: 'Simpan', tone: 'warning' }))) return
   saving.value = true
   errors.value = {}
   try {

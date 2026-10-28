@@ -270,7 +270,7 @@ onMounted(async () => {
             </div>
 
             <h2 class="border-t border-slate-100 pt-4 font-semibold">Kertas laporan (Export PDF)</h2>
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <div>
                 <label class="label">Ukuran kertas</label>
                 <div class="segmented">
@@ -517,7 +517,7 @@ onMounted(async () => {
                 Uang tunai masuk ke kas fisik kasir masing-masing; transaksi non tunai masuk ke rekening di bawah ini.
                 Rekening dikelola di menu <RouterLink :to="{ name: 'cash' }" class="text-brand-700 underline">Kas &amp; Bank</RouterLink>.
               </p>
-              <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div v-for="item in bankMethods" :key="item.key">
                   <label class="label">{{ item.label }}</label>
                   <AppSelect

@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import { confirmDialog } from '../stores/confirm'
 
 /**
  * Halaman bersama untuk Supplier dan Pelanggan.
@@ -75,7 +76,7 @@ async function save() {
 }
 
 async function remove(contact) {
-  if (!confirm(`Hapus ${label.value.toLowerCase()} ${contact.name}?`)) return
+  if (!(await confirmDialog({ title: `Hapus ${label.value.toLowerCase()}`, message: `Hapus ${label.value.toLowerCase()} ${contact.name}?`, confirmLabel: 'Hapus', tone: 'danger' }))) return
   try {
     await http.delete(`/${props.type}/${contact.id}`)
     toast.success(`${label.value} dihapus.`)

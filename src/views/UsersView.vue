@@ -9,6 +9,7 @@ import PageHeader from '../components/PageHeader.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const can = {
@@ -82,7 +83,7 @@ async function save() {
 }
 
 async function resendPassword(user) {
-  if (!confirm(`Kirim kata sandi sementara baru ke ${user.email}?\n\nKata sandi ${user.name} saat ini tidak berlaku lagi dan semua perangkatnya akan keluar.`)) return
+  if (!(await confirmDialog({ title: 'Kirim kata sandi sementara', message: `Kirim kata sandi sementara baru ke ${user.email}?\n\nKata sandi ${user.name} saat ini tidak berlaku lagi dan semua perangkatnya akan keluar.`, confirmLabel: 'Kirim', tone: 'warning', icon: 'lock' }))) return
   busy.value = 'password'
   try {
     const { data } = await http.post(`/users/${user.id}/temporary-password`)
@@ -97,7 +98,7 @@ async function resendPassword(user) {
 }
 
 async function resetTwoFactor(user) {
-  if (!confirm(`Nonaktifkan verifikasi 2 langkah ${user.name}?\n\nGunakan bila HP-nya hilang dan kode pemulihan tidak ada. ${user.name} perlu masuk ulang dan bisa mengaktifkannya lagi di Profil Saya.`)) return
+  if (!(await confirmDialog({ title: 'Nonaktifkan verifikasi 2 langkah', message: `Nonaktifkan verifikasi 2 langkah ${user.name}?\n\nGunakan bila HP-nya hilang dan kode pemulihan tidak ada. ${user.name} perlu masuk ulang dan bisa mengaktifkannya lagi di Profil Saya.`, confirmLabel: 'Nonaktifkan', tone: 'danger', icon: 'shield' }))) return
   busy.value = 'two_factor'
   try {
     const { data } = await http.delete(`/users/${user.id}/two-factor`)
@@ -121,7 +122,7 @@ async function copyPassword() {
 }
 
 async function remove(user) {
-  if (!confirm(`Hapus pengguna ${user.name}?`)) return
+  if (!(await confirmDialog({ title: 'Hapus pengguna', message: `Hapus pengguna ${user.name}?`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   try {
     await http.delete(`/users/${user.id}`)
     toast.success('Pengguna dihapus.')

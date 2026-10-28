@@ -16,6 +16,7 @@ import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import NumberInput from '../components/NumberInput.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -155,7 +156,7 @@ async function save() {
 }
 
 async function remove(product) {
-  if (!confirm(`Hapus produk ${product.name}?`)) return
+  if (!(await confirmDialog({ title: 'Hapus produk', message: `Hapus produk ${product.name}?`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   try {
     await http.delete(`/products/${product.id}`)
     toast.success('Produk dihapus.')
@@ -219,7 +220,7 @@ async function saveCategory() {
 }
 
 async function removeCategory(category) {
-  if (!confirm(`Hapus kategori ${category.name}? Produk di dalamnya menjadi tanpa kategori.`)) return
+  if (!(await confirmDialog({ title: 'Hapus kategori', message: `Hapus kategori ${category.name}? Produk di dalamnya menjadi tanpa kategori.`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   await http.delete(`/categories/${category.id}`).catch((e) => toast.error(errorMessage(e)))
   loadCategories()
 }

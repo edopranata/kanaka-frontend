@@ -10,6 +10,7 @@ import AppModal from '../components/AppModal.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { MAX_SHORTCUTS, SHORTCUT_OPTIONS, shortcutOption } from '../utils/menu'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -249,7 +250,7 @@ async function save() {
 }
 
 async function remove(role) {
-  if (!confirm(`Hapus role ${role.name}?`)) return
+  if (!(await confirmDialog({ title: 'Hapus role', message: `Hapus role ${role.name}?`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   try {
     await http.delete(`/roles/${role.id}`)
     toast.success('Role dihapus.')

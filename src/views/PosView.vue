@@ -18,6 +18,7 @@ import { bestPromo } from '../utils/discount'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import PrinterStatus from '../components/PrinterStatus.vue'
 import AppSelect from '../components/AppSelect.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const CART_KEY = 'penjualan.cart'
 
@@ -206,8 +207,8 @@ function removeLine(index) {
   cart.items.splice(index, 1)
 }
 
-function clearCart(ask = true) {
-  if (ask && cart.items.length && !confirm('Kosongkan keranjang?')) return
+async function clearCart(ask = true) {
+  if (ask && cart.items.length && !(await confirmDialog({ title: 'Kosongkan keranjang', message: `Hapus ${cart.items.length} barang dari keranjang?`, confirmLabel: 'Kosongkan', tone: 'danger', icon: 'cart' }))) return
   Object.assign(cart, { items: [], customer: null, notes: '' })
   searchInput.value?.focus()
 }

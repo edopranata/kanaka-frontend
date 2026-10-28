@@ -9,6 +9,7 @@ import { hariTanggal, number, rupiah, waktu } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,7 +34,7 @@ async function load() {
 }
 
 async function cancel() {
-  if (!confirm('Batalkan closing ini? Transaksi pada tanggal tersebut akan terbuka kembali untuk dikoreksi.')) return
+  if (!(await confirmDialog({ title: 'Batalkan closing', message: 'Batalkan closing ini? Transaksi pada tanggal tersebut akan terbuka kembali untuk dikoreksi.', confirmLabel: 'Batalkan closing', cancelLabel: 'Kembali', tone: 'danger' }))) return
   try {
     await http.delete(`/closings/${closing.value.id}`)
     toast.success('Closing dibatalkan.')

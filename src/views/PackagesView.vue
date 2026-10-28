@@ -13,6 +13,7 @@ import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -141,7 +142,7 @@ async function save() {
 }
 
 async function remove(pkg) {
-  if (!confirm(`Hapus paket ${pkg.name}?`)) return
+  if (!(await confirmDialog({ title: 'Hapus paket', message: `Hapus paket ${pkg.name}?`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   try {
     await http.delete(`/products/${pkg.id}`)
     toast.success('Paket dihapus.')

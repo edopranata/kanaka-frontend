@@ -14,6 +14,7 @@ import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -59,7 +60,7 @@ async function pay() {
 }
 
 async function cancelPayment(payment) {
-  if (!confirm(`Batalkan pembayaran ${rupiah(payment.amount)} tanggal ${tanggal(payment.date)}?`)) return
+  if (!(await confirmDialog({ title: 'Batalkan pembayaran', message: `Batalkan pembayaran ${rupiah(payment.amount)} tanggal ${tanggal(payment.date)}?`, confirmLabel: 'Batalkan pembayaran', cancelLabel: 'Kembali', tone: 'danger' }))) return
   try {
     const { data } = await http.delete(`/bills/${bill.value.id}/payments/${payment.id}`)
     bill.value = data.data
@@ -70,7 +71,7 @@ async function cancelPayment(payment) {
 }
 
 async function cancelBill() {
-  if (!confirm('Batalkan tagihan ini? Bon di dalamnya kembali berstatus "belum ditagih".')) return
+  if (!(await confirmDialog({ title: 'Batalkan tagihan', message: 'Batalkan tagihan ini? Bon di dalamnya kembali berstatus "belum ditagih".', confirmLabel: 'Batalkan tagihan', cancelLabel: 'Kembali', tone: 'danger' }))) return
   try {
     await http.delete(`/bills/${bill.value.id}`)
     toast.success('Tagihan dibatalkan.')

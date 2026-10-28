@@ -10,6 +10,7 @@ import BankSelect from '../components/BankSelect.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import AppSelect from '../components/AppSelect.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -76,7 +77,7 @@ async function save() {
   const message = total.value
     ? `Total yang harus dibayar ke supplier ${rupiah(total.value)}${form.pay_now ? ` dibayar sekarang (${meta.paymentLabel(form.payment_method)})` : ' dicatat sebagai hutang'}. Lanjutkan?`
     : 'Tidak ada barang terjual. Simpan penyelesaian (retur / penyesuaian stok)?'
-  if (!confirm(message)) return
+  if (!(await confirmDialog({ title: 'Simpan penyelesaian titipan', message, confirmLabel: 'Simpan' }))) return
 
   saving.value = true
   errors.value = {}

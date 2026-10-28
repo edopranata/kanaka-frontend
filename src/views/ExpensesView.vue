@@ -15,6 +15,7 @@ import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import AppSelect from '../components/AppSelect.vue'
 import DateInput from '../components/DateInput.vue'
+import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -74,7 +75,7 @@ async function save() {
 }
 
 async function remove(expense) {
-  if (!confirm(`Hapus pengeluaran "${expense.description}"?`)) return
+  if (!(await confirmDialog({ title: 'Hapus pengeluaran', message: `Hapus pengeluaran "${expense.description}"?`, confirmLabel: 'Hapus', tone: 'danger', icon: 'trash' }))) return
   try {
     await http.delete(`/expenses/${expense.id}`)
     toast.success('Pengeluaran dihapus.')

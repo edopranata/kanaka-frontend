@@ -1,3 +1,8 @@
+<script>
+// Dialog yang sedang terbuka, urut dari bawah ke atas (mis. konfirmasi di atas form): Escape hanya menutup yang paling atas.
+const stack = []
+</script>
+
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -37,18 +42,21 @@ function close() {
   open.value = false
 }
 
+const self = {}
 function onKeydown(event) {
-  if (event.key === 'Escape') close()
+  if (event.key === 'Escape' && stack.at(-1) === self) close()
 }
 
 onMounted(() => {
   open.value = true
+  stack.push(self)
   document.addEventListener('keydown', onKeydown)
   document.body.style.overflow = 'hidden'
 })
 onBeforeUnmount(() => {
+  stack.splice(stack.indexOf(self), 1)
   document.removeEventListener('keydown', onKeydown)
-  document.body.style.overflow = ''
+  if (!stack.length) document.body.style.overflow = ''
 })
 </script>
 

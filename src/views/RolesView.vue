@@ -8,6 +8,7 @@ import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
 import PageHeader from '../components/PageHeader.vue'
+import AppSelect from '../components/AppSelect.vue'
 import { MAX_SHORTCUTS, SHORTCUT_OPTIONS, shortcutOption } from '../utils/menu'
 
 const auth = useAuthStore()
@@ -319,16 +320,11 @@ onMounted(load)
           </div>
           <div>
             <label class="label">Halaman awal setelah login</label>
-            <select v-model="form.home" class="input" :disabled="form.is_system">
-              <option v-for="(label, value) in homes" :key="value" :value="value">{{ label }}</option>
-            </select>
+            <AppSelect v-model="form.home" class="input" :options="Object.entries(homes).map(([value, label]) => ({ value, label }))" :disabled="form.is_system" />
           </div>
           <div v-if="!form.is_system">
             <label class="label">Salin hak akses dari</label>
-            <select class="input" @change="copyFrom($event.target.value); $event.target.value = ''">
-              <option value="">Pilih role…</option>
-              <option v-for="role in roles.filter((item) => item.id !== form.id)" :key="role.id" :value="role.id">{{ role.name }}</option>
-            </select>
+            <AppSelect class="input" model-value="" :options="roles.filter((item) => item.id !== form.id)" value-key="id" label-key="name" placeholder="Pilih role…" @update:model-value="copyFrom" />
           </div>
           <div>
             <label class="label">Menu pintasan bawaan <span class="font-normal text-slate-400">({{ form.sidebar_shortcuts.length }}/{{ MAX_SHORTCUTS }})</span></label>
@@ -348,16 +344,14 @@ onMounted(load)
                 </button>
               </li>
             </ol>
-            <select
+            <AppSelect
               v-if="canEditShortcuts && form.sidebar_shortcuts.length < MAX_SHORTCUTS"
               class="input"
-              @change="addShortcut($event.target.value); $event.target.value = ''"
-            >
-              <option value="">Tambah menu pintasan…</option>
-              <optgroup v-for="group in shortcutGroups" :key="group.label" :label="group.label">
-                <option v-for="item in group.items" :key="item.name" :value="item.name">{{ item.label }}</option>
-              </optgroup>
-            </select>
+              model-value=""
+              :options="shortcutGroups.flatMap((group) => group.items.map((item) => ({ value: item.name, label: item.label, group: group.label })))"
+              placeholder="Tambah menu pintasan…"
+              @update:model-value="addShortcut"
+            />
             <p class="mt-1 text-xs text-slate-500">Tampil di bawah Dashboard bagi pengguna role ini yang belum mengatur pintasan sendiri di Profil Saya.</p>
           </div>
           <p class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">

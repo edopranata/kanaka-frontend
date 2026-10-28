@@ -11,6 +11,8 @@ import BankSelect from '../components/BankSelect.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
+import AppSelect from '../components/AppSelect.vue'
+import DateInput from '../components/DateInput.vue'
 
 const router = useRouter()
 const toast = useToastStore()
@@ -124,15 +126,12 @@ onMounted(async () => {
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Tanggal</label>
-          <input v-model="form.date" type="date" class="input" :max="today()" :class="{ 'input-error': errors.date }" />
+          <DateInput v-model="form.date" class="input" :max="today()" :class="{ 'input-error': errors.date }" />
           <p v-if="errors.date" class="error-text">{{ errors.date }}</p>
         </div>
         <div>
           <label class="label">Supplier</label>
-          <select v-model="form.supplier_id" class="input">
-            <option value="">— Tanpa supplier —</option>
-            <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
-          </select>
+          <AppSelect v-model="form.supplier_id" class="input" :options="suppliers" value-key="id" label-key="name" empty="— Tanpa supplier —" />
         </div>
         <div>
           <label class="label">No. faktur supplier</label>
@@ -190,9 +189,15 @@ onMounted(async () => {
                   </div>
                 </td>
                 <td>
-                  <select v-if="item.units.length > 1" :value="item.unit_id ?? ''" class="input h-10 w-32 py-0" @change="changeUnit(item, $event.target.value)">
-                    <option v-for="unit in item.units" :key="unit.id ?? 'base'" :value="unit.id ?? ''">{{ unit.name }}{{ unit.conversion > 1 ? ` (isi ${unit.conversion})` : '' }}</option>
-                  </select>
+                  <AppSelect
+                    v-if="item.units.length > 1"
+                    :model-value="item.unit_id"
+                    class="input h-10 w-32 py-0"
+                    :options="item.units"
+                    value-key="id"
+                    :label-key="(unit) => `${unit.name}${unit.conversion > 1 ? ` (isi ${unit.conversion})` : ''}`"
+                    @update:model-value="changeUnit(item, $event)"
+                  />
                   <div v-else class="flex h-10 items-center">{{ item.base_unit }}</div>
                   <p v-if="item.conversion > 1" class="mt-1 text-xs text-slate-500">= {{ number((item.qty || 0) * item.conversion) }} {{ item.base_unit }}</p>
                 </td>

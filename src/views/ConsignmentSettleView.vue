@@ -9,6 +9,7 @@ import AppIcon from '../components/AppIcon.vue'
 import BankSelect from '../components/BankSelect.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -117,10 +118,7 @@ onMounted(async () => {
     <div class="card mb-4 flex flex-wrap items-end gap-3 p-4">
       <div class="min-w-64 flex-1">
         <label class="label">Supplier</label>
-        <select v-model="supplierId" class="input">
-          <option value="">— Pilih supplier —</option>
-          <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
-        </select>
+        <AppSelect v-model="supplierId" class="input" :options="suppliers" value-key="id" label-key="name" empty="— Pilih supplier —" />
       </div>
       <div v-if="lines.length" class="flex flex-wrap gap-2">
         <button type="button" class="btn-secondary" @click="returnAll"><AppIcon name="back" :size="16" /> Retur semua sisa</button>
@@ -190,9 +188,7 @@ onMounted(async () => {
             <button type="button" class="tab justify-center" :class="{ 'tab-active bg-brand-50': !form.pay_now }" @click="form.pay_now = false">Bayar nanti (hutang)</button>
             <button type="button" class="tab justify-center" :class="{ 'tab-active bg-brand-50': form.pay_now }" @click="form.pay_now = true">Bayar sekarang</button>
           </div>
-          <select v-if="form.pay_now" v-model="form.payment_method" class="input">
-            <option v-for="method in meta.payment_methods" :key="method.value" :value="method.value">{{ method.label }}</option>
-          </select>
+          <AppSelect v-if="form.pay_now" v-model="form.payment_method" class="input" :options="meta.payment_methods" />
           <p v-if="form.pay_now && form.payment_method === 'tunai'" class="text-xs text-slate-500">Diambil dari kas fisik Anda — otomatis tercatat di Kas &amp; Bank.</p>
           <BankSelect v-if="form.pay_now" v-model="form.cash_account_id" :method="form.payment_method" label="Dari rekening" />
           <button class="btn-primary w-full" :disabled="saving || !included.length" @click="save">

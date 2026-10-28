@@ -1,6 +1,7 @@
 <script setup>
 import LoadingBar from './components/LoadingBar.vue'
 import ToastContainer from './components/ToastContainer.vue'
+import UpdatePrompt from './components/UpdatePrompt.vue'
 </script>
 
 <template>
@@ -11,4 +12,5 @@ import ToastContainer from './components/ToastContainer.vue'
     </Transition>
   </RouterView>
   <ToastContainer />
+  <UpdatePrompt />
 </template>

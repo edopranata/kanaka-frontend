@@ -17,6 +17,7 @@ import { lineKey, optionalComponents, packagePrice } from '../utils/cart'
 import { bestPromo } from '../utils/discount'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import PrinterStatus from '../components/PrinterStatus.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const CART_KEY = 'penjualan.cart'
 
@@ -450,9 +451,15 @@ onBeforeUnmount(() => {
                 <p class="truncate text-sm font-medium">{{ line.name }}</p>
                 <p class="flex flex-wrap items-center gap-1 text-xs text-slate-500">
                   {{ rupiah(line.price) }} /
-                  <select v-if="line.units.length > 1" :value="line.unit_id" class="rounded border border-slate-300 bg-white py-0 pr-6 pl-1 text-xs" @change="changeUnit(line, $event.target.value)">
-                    <option v-for="unit in line.units" :key="unit.id" :value="unit.id">{{ unit.name }}{{ unit.conversion > 1 ? ` (${unit.conversion})` : '' }}</option>
-                  </select>
+                  <AppSelect
+                    v-if="line.units.length > 1"
+                    :model-value="line.unit_id"
+                    class="rounded-md border border-slate-300 bg-white py-0.5 pr-1 pl-1.5 text-xs transition-colors hover:border-slate-400"
+                    :options="line.units"
+                    value-key="id"
+                    :label-key="(unit) => `${unit.name}${unit.conversion > 1 ? ` (${unit.conversion})` : ''}`"
+                    @update:model-value="changeUnit(line, $event)"
+                  />
                   <span v-else>{{ line.unit }}</span>
                   <span v-if="line.conversion > 1">= {{ number(line.qty * line.conversion) }} {{ line.base_unit }}</span>
                   <span v-if="overStock(line)" class="font-medium text-red-600">· {{ line.is_package ? `tersedia ${number(line.available)}` : `stok ${number(line.stock)} ${line.base_unit}` }}</span>

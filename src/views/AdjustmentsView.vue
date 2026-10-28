@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -47,10 +48,7 @@ onMounted(() => load())
 
     <div class="card mb-4 space-y-3 p-4">
       <DateRange v-model:from="filters.from" v-model:to="filters.to" @change="load()" />
-      <select v-model="filters.type" class="input sm:w-60" @change="load()">
-        <option value="">Semua jenis</option>
-        <option v-for="type in meta.adjustment_types" :key="type.value" :value="type.value">{{ type.label }}</option>
-      </select>
+      <AppSelect v-model="filters.type" class="input sm:w-60" :options="meta.adjustment_types" empty="Semua jenis" @change="load()" />
     </div>
 
     <div class="card overflow-hidden">

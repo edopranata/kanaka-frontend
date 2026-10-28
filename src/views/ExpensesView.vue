@@ -13,6 +13,8 @@ import EmptyState from '../components/EmptyState.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import AppSelect from '../components/AppSelect.vue'
+import DateInput from '../components/DateInput.vue'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -95,10 +97,7 @@ onMounted(() => load())
 
     <div class="card mb-4 space-y-3 p-4">
       <DateRange v-model:from="filters.from" v-model:to="filters.to" @change="load()" />
-      <select v-model="filters.category" class="input sm:w-64" @change="load()">
-        <option value="">Semua kategori</option>
-        <option v-for="category in meta.expense_categories" :key="category" :value="category">{{ category }}</option>
-      </select>
+      <AppSelect v-model="filters.category" class="input sm:w-64" :options="meta.expense_categories" empty="Semua kategori" @change="load()" />
     </div>
 
     <div class="card overflow-hidden">
@@ -132,7 +131,7 @@ onMounted(() => load())
       <form id="expense-form" class="grid gap-3 sm:grid-cols-2" @submit.prevent="save">
         <div>
           <label class="label">Tanggal</label>
-          <input v-model="form.date" type="date" class="input" :max="today()" :class="{ 'input-error': errors.date }" />
+          <DateInput v-model="form.date" class="input" :max="today()" :class="{ 'input-error': errors.date }" />
           <p v-if="errors.date" class="error-text">{{ errors.date }}</p>
         </div>
         <div>
@@ -151,9 +150,7 @@ onMounted(() => load())
         </div>
         <div>
           <label class="label">Dibayar dengan</label>
-          <select v-model="form.payment_method" class="input">
-            <option v-for="method in meta.payment_methods" :key="method.value" :value="method.value">{{ method.label }}</option>
-          </select>
+          <AppSelect v-model="form.payment_method" class="input" :options="meta.payment_methods" />
           <p class="mt-1 text-xs text-slate-500">{{ form.payment_method === 'tunai' ? `Tunai = diambil dari kas fisik ${form.id ? 'pencatat' : 'Anda'}.` : 'Non tunai = diambil dari rekening bank.' }}</p>
         </div>
         <BankSelect v-model="form.cash_account_id" :method="form.payment_method" label="Dari rekening" />

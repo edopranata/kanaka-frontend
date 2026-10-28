@@ -14,6 +14,9 @@ import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
+import DateInput from '../components/DateInput.vue'
+import NumberInput from '../components/NumberInput.vue'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -235,23 +238,23 @@ onMounted(() => {
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="label">{{ valueLabel }}</label>
-              <input v-if="form.type === 'persen'" v-model.number="form.value" type="number" min="0.01" max="100" step="0.01" class="input" :class="{ 'input-error': errors.value }" required />
+              <NumberInput v-if="form.type === 'persen'" v-model="form.value" :min="0.01" :max="100" :step="0.01" suffix="%" :invalid="!!errors.value" required />
               <MoneyInput v-else v-model="form.value" :invalid="!!errors.value" />
               <p v-if="errors.value" class="error-text">{{ errors.value }}</p>
             </div>
             <div>
               <label class="label">Minimal beli (qty)</label>
-              <input v-model.number="form.min_qty" type="number" min="1" class="input" :class="{ 'input-error': errors.min_qty }" required />
+              <NumberInput v-model="form.min_qty" :min="1" :invalid="!!errors.min_qty" required />
               <p v-if="errors.min_qty" class="error-text">{{ errors.min_qty }}</p>
             </div>
             <div>
               <label class="label">Mulai</label>
-              <input v-model="form.starts_on" type="date" class="input" :class="{ 'input-error': errors.starts_on }" required />
+              <DateInput v-model="form.starts_on" class="input" :class="{ 'input-error': errors.starts_on }" />
               <p v-if="errors.starts_on" class="error-text">{{ errors.starts_on }}</p>
             </div>
             <div>
               <label class="label">Berakhir <span class="font-normal text-slate-400">(kosong = tanpa batas)</span></label>
-              <input v-model="form.ends_on" type="date" class="input" :class="{ 'input-error': errors.ends_on }" :min="form.starts_on" />
+              <DateInput v-model="form.ends_on" class="input" :class="{ 'input-error': errors.ends_on }" :min="form.starts_on" placeholder="Tanpa batas" clearable />
               <p v-if="errors.ends_on" class="error-text">{{ errors.ends_on }}</p>
             </div>
           </div>
@@ -287,10 +290,15 @@ onMounted(() => {
                 </p>
                 <p v-if="itemError(index)" class="error-text">{{ itemError(index) }}</p>
               </div>
-              <select v-model="item.product_unit_id" class="input order-last col-span-2 h-10 py-0 sm:order-none sm:col-span-1">
-                <option :value="null">Semua satuan</option>
-                <option v-for="unit in item.units" :key="unit.id" :value="unit.id">Hanya {{ unit.name }}</option>
-              </select>
+              <AppSelect
+                v-model="item.product_unit_id"
+                class="input order-last col-span-2 h-10 py-0 sm:order-none sm:col-span-1"
+                :options="item.units"
+                value-key="id"
+                :label-key="(unit) => `Hanya ${unit.name}`"
+                empty="Semua satuan"
+                :empty-value="null"
+              />
               <button type="button" class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Hapus produk" @click="form.items.splice(index, 1)"><AppIcon name="trash" :size="16" /></button>
             </div>
           </TransitionGroup>

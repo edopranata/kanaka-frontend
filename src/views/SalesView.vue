@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const auth = useAuthStore()
 const meta = useMetaStore()
@@ -45,16 +46,23 @@ onMounted(() => load())
       <DateRange v-model:from="filters.from" v-model:to="filters.to" @change="load()" />
       <div class="grid gap-2 sm:grid-cols-3">
         <input v-model="filters.search" type="search" class="input" placeholder="Cari no. invoice…" @keydown.enter="load()" />
-        <select v-model="filters.status" class="input" @change="load()">
-          <option value="">Semua status</option>
-          <option value="selesai">Selesai</option>
-          <option value="batal">Dibatalkan</option>
-        </select>
-        <select v-model="filters.payment_method" class="input" @change="load()">
-          <option value="">Semua metode bayar</option>
-          <option v-for="method in meta.payment_methods" :key="method.value" :value="method.value">{{ method.label }}</option>
-          <option value="piutang">Piutang (Bon)</option>
-        </select>
+        <AppSelect
+          v-model="filters.status"
+          class="input"
+          :options="[
+            { value: 'selesai', label: 'Selesai' },
+            { value: 'batal', label: 'Dibatalkan' },
+          ]"
+          empty="Semua status"
+          @change="load()"
+        />
+        <AppSelect
+          v-model="filters.payment_method"
+          class="input"
+          :options="[...meta.payment_methods, { value: 'piutang', label: 'Piutang (Bon)' }]"
+          empty="Semua metode bayar"
+          @change="load()"
+        />
       </div>
     </div>
 

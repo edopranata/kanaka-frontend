@@ -16,6 +16,7 @@ import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import ReceiptPrint from '../components/ReceiptPrint.vue'
 import PrinterStatus from '../components/PrinterStatus.vue'
+import AppSelect from '../components/AppSelect.vue'
 
 const meta = useMetaStore()
 const toast = useToastStore()
@@ -197,9 +198,15 @@ onMounted(() => {
                   </div>
                 </td>
                 <td>
-                  <select v-if="line.units.length > 1" :value="line.unit_id" class="input h-10 w-32 py-0" @change="changeUnit(line, $event.target.value)">
-                    <option v-for="unit in line.units" :key="unit.id" :value="unit.id">{{ unit.name }}{{ unit.conversion > 1 ? ` (isi ${unit.conversion})` : '' }}</option>
-                  </select>
+                  <AppSelect
+                    v-if="line.units.length > 1"
+                    :model-value="line.unit_id"
+                    class="input h-10 w-32 py-0"
+                    :options="line.units"
+                    value-key="id"
+                    :label-key="(unit) => `${unit.name}${unit.conversion > 1 ? ` (isi ${unit.conversion})` : ''}`"
+                    @update:model-value="changeUnit(line, $event)"
+                  />
                   <div v-else class="flex h-10 items-center">{{ line.units[0].name }}</div>
                 </td>
                 <td class="num"><input v-model.number="line.qty" type="number" min="1" class="input ml-auto h-10 w-20 py-0 text-right" @focus="$event.target.select()" /></td>

@@ -7,6 +7,7 @@ import { printWithBrowser, receiptPaper, receiptUrl } from '../utils/print'
 import { choosePrinter, disconnect, forgetPrinter, isDirect, printerConfig, printerState, reconnect, sendBytes, support } from '../utils/printer'
 import AppIcon from './AppIcon.vue'
 import ReceiptPrint from './ReceiptPrint.vue'
+import NumberInput from './NumberInput.vue'
 
 /**
  * Pengaturan printer struk untuk PERANGKAT INI (tersimpan di browser), termasuk tes cetak.
@@ -212,7 +213,7 @@ onMounted(() => reconnect())
           </div>
           <div>
             <label class="label" for="printer-feed">Jarak kertas setelah struk (baris)</label>
-            <input id="printer-feed" v-model.number="printerConfig.feed" type="number" min="0" max="10" class="input max-w-32" />
+            <NumberInput id="printer-feed" v-model="printerConfig.feed" :min="0" :max="10" suffix="baris" class="max-w-48" />
           </div>
           <div class="flex flex-wrap gap-x-8 gap-y-3 border-t border-slate-100 pt-4 md:col-span-2">
             <label class="flex items-start gap-2 text-sm">

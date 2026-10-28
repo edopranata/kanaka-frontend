@@ -1,5 +1,6 @@
 <script setup>
 import { daysAgo, monthEnd, monthStart, today } from '../utils/format'
+import DateInput from './DateInput.vue'
 
 const from = defineModel('from', { type: String, required: true })
 const to = defineModel('to', { type: String, required: true })
@@ -23,11 +24,11 @@ function apply(preset) {
   <div class="flex flex-wrap items-end gap-2">
     <div>
       <label class="label text-xs">Dari</label>
-      <input v-model="from" type="date" class="input" :max="to" @change="emit('change')" />
+      <DateInput v-model="from" class="input min-w-44" :max="to" @change="emit('change')" />
     </div>
     <div>
       <label class="label text-xs">Sampai</label>
-      <input v-model="to" type="date" class="input" :min="from" @change="emit('change')" />
+      <DateInput v-model="to" class="input min-w-44" :min="from" @change="emit('change')" />
     </div>
     <div class="flex flex-wrap gap-1">
       <button v-for="preset in presets" :key="preset.label" type="button" class="btn-secondary btn-sm" @click="apply(preset)">

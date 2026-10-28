@@ -14,6 +14,8 @@ import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
+import NumberInput from '../components/NumberInput.vue'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -33,6 +35,15 @@ const can = {
 const priceLocked = (form) => Boolean(form?.id) && !can.price
 
 // Status default: hanya produk aktif (tampil di kasir). '' = semua status.
+const activeOptions = [
+  { value: '1', label: 'Aktif' },
+  { value: '0', label: 'Nonaktif' },
+  { value: '', label: 'Semua status' },
+]
+const sellableOptions = [
+  { value: '1', label: 'Sudah ada harga jual' },
+  { value: '0', label: 'Belum ada harga jual' },
+]
 const filters = reactive({ search: '', category_id: '', low_stock: route.query.low_stock === '1' ? 1 : 0, sellable: '', active: route.query.active ?? '1' })
 const products = ref([])
 const pagination = ref(null)
@@ -234,20 +245,9 @@ onMounted(() => {
         <input v-model="filters.search" type="search" class="input pr-11" placeholder="Cari nama / SKU / scan barcode…" @keydown.enter="load()" @search="load()" />
         <ScanButton class="absolute top-1/2 right-1.5 h-8 w-8 -translate-y-1/2" title="Cari produk" @detected="filters.search = $event; filters.active = ''; load()" />
       </div>
-      <select v-model="filters.active" class="input" @change="load()">
-        <option value="1">Aktif</option>
-        <option value="0">Nonaktif</option>
-        <option value="">Semua status</option>
-      </select>
-      <select v-model="filters.sellable" class="input" @change="load()">
-        <option value="">Semua produk</option>
-        <option value="1">Sudah ada harga jual</option>
-        <option value="0">Belum ada harga jual</option>
-      </select>
-      <select v-model="filters.category_id" class="input" @change="load()">
-        <option value="">Semua kategori</option>
-        <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-      </select>
+      <AppSelect v-model="filters.active" class="input" :options="activeOptions" @change="load()" />
+      <AppSelect v-model="filters.sellable" class="input" :options="sellableOptions" empty="Semua produk" @change="load()" />
+      <AppSelect v-model="filters.category_id" class="input" :options="categories" value-key="id" label-key="name" empty="Semua kategori" @change="load()" />
       <label class="flex items-center gap-2 text-sm">
         <input v-model="filters.low_stock" type="checkbox" :true-value="1" :false-value="0" class="h-4 w-4 rounded border-slate-300" @change="load()" />
         Hanya stok menipis
@@ -354,10 +354,7 @@ onMounted(() => {
         </div>
         <div>
           <label class="label">Kategori</label>
-          <select v-model="form.category_id" class="input">
-            <option value="">Tanpa kategori</option>
-            <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-          </select>
+          <AppSelect v-model="form.category_id" class="input" :options="categories" value-key="id" label-key="name" empty="Tanpa kategori" />
         </div>
         <div>
           <label class="label">Satuan dasar (satuan stok)</label>
@@ -424,11 +421,11 @@ onMounted(() => {
         </div>
         <div>
           <label class="label">Stok minimum (peringatan)</label>
-          <input v-model.number="form.min_stock" type="number" min="0" class="input" />
+          <NumberInput v-model="form.min_stock" :min="0" />
         </div>
         <div v-if="canSetInitialStock(form)">
           <label class="label">Stok awal ({{ form.unit || 'satuan dasar' }})</label>
-          <input v-model.number="form.initial_stock" type="number" min="0" class="input" :class="{ 'input-error': errors.initial_stock }" @focus="$event.target.select()" />
+          <NumberInput v-model="form.initial_stock" :min="0" :invalid="!!errors.initial_stock" />
           <p v-if="errors.initial_stock" class="error-text">{{ errors.initial_stock }}</p>
           <p v-else-if="form.id" class="mt-1 text-xs text-slate-500">Belum ada transaksi — stok awal bisa diisi sekali, dicatat di kartu stok dengan HPP di atas.</p>
         </div>
@@ -459,7 +456,20 @@ onMounted(() => {
           <code>KONVERSI SATUAN DASAR</code>, <code>HARGA POKOK</code>, <code>HARGA JUAL</code>, <code>STOK</code>, <code>STOK MINIMUM</code>.
           Baris dengan kode item sama dan satuan berbeda menjadi satuan tambahan (multi satuan).
         </p>
-        <input type="file" accept=".xlsx,.xls,.csv" class="input" @change="importFile = $event.target.files[0]" />
+        <label
+          class="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed p-4 transition-colors duration-150"
+          :class="importFile ? 'border-brand-300 bg-brand-50/60' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'"
+        >
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full" :class="importFile ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'">
+            <AppIcon :name="importFile ? 'document' : 'upload'" :size="20" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate font-medium text-slate-800">{{ importFile ? importFile.name : 'Pilih file Excel / CSV' }}</span>
+            <span class="block text-xs text-slate-500">{{ importFile ? `${(importFile.size / 1024 / 1024).toFixed(2)} MB · klik untuk ganti file` : '.xlsx, .xls, atau .csv' }}</span>
+          </span>
+          <span class="btn-secondary btn-sm pointer-events-none">{{ importFile ? 'Ganti' : 'Pilih file' }}</span>
+          <input type="file" accept=".xlsx,.xls,.csv" class="sr-only" @change="importFile = $event.target.files[0] || importFile" />
+        </label>
         <p class="-mt-2 text-xs text-slate-500">
           File besar (puluhan ribu barang) sebaiknya <b>CSV</b> agar hemat memori server. Ubah dari Excel dengan
           <code>php artisan products:to-csv file.xlsx</code> (barcode tetap utuh).

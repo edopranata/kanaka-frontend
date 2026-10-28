@@ -9,6 +9,7 @@ import AppIcon from '../components/AppIcon.vue'
 import DateRange from '../components/DateRange.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ReportTable from '../components/ReportTable.vue'
+import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -105,10 +106,7 @@ onMounted(async () => {
       <DateRange v-if="current.dated" v-model:from="filters.from" v-model:to="filters.to" @change="load" />
       <div v-if="['products', 'stock'].includes(active)">
         <label class="label text-xs">Kategori</label>
-        <select v-model="filters.category_id" class="input" @change="load">
-          <option value="">Semua kategori</option>
-          <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-        </select>
+        <AppSelect v-model="filters.category_id" class="input" :options="categories" value-key="id" label-key="name" empty="Semua kategori" @change="load()" />
       </div>
       <label v-if="active === 'stock'" class="flex items-center gap-2 pb-2 text-sm">
         <input v-model="filters.low_stock" type="checkbox" class="h-4 w-4 rounded border-slate-300" @change="load" /> Hanya stok menipis

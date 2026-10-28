@@ -10,6 +10,7 @@ import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -140,13 +141,18 @@ onMounted(() => switchTab(tab.value))
       <!-- Penyelesaian & hutang -->
       <div v-else key="settlements" class="space-y-4">
         <div class="card flex flex-wrap items-center justify-between gap-3 p-4">
-          <select v-model="filters.status" class="input sm:w-60" @change="loadSettlements()">
-            <option value="terbuka">Belum lunas</option>
-            <option value="belum">Belum dibayar</option>
-            <option value="sebagian">Dibayar sebagian</option>
-            <option value="lunas">Lunas</option>
-            <option value="">Semua</option>
-          </select>
+          <AppSelect
+            v-model="filters.status"
+            class="input sm:w-60"
+            :options="[
+              { value: 'terbuka', label: 'Belum lunas' },
+              { value: 'belum', label: 'Belum dibayar' },
+              { value: 'sebagian', label: 'Dibayar sebagian' },
+              { value: 'lunas', label: 'Lunas' },
+              { value: '', label: 'Semua' },
+            ]"
+            @change="loadSettlements()"
+          />
           <p class="text-sm text-slate-600">Total hutang titipan: <b class="text-red-600 tabular-nums">{{ rupiah(outstanding) }}</b></p>
         </div>
         <div class="card overflow-hidden">

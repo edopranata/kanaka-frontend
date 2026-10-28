@@ -8,6 +8,7 @@ import { number, today } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
+import DateInput from '../components/DateInput.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -119,7 +120,7 @@ async function save() {
         </div>
         <div>
           <label class="label">Tanggal</label>
-          <input v-model="form.date" type="date" class="input" :max="today()" />
+          <DateInput v-model="form.date" class="input" :max="today()" />
         </div>
         <div>
           <label class="label">Alasan</label>

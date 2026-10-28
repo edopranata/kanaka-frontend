@@ -12,6 +12,8 @@ import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import AppSelect from '../components/AppSelect.vue'
+import DateInput from '../components/DateInput.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -123,15 +125,20 @@ onMounted(() => loadBills())
       <div v-if="tab === 'bills'" key="bills">
         <div class="card mb-4 grid gap-2 p-4 sm:grid-cols-3">
           <input v-model="filters.search" type="search" class="input" placeholder="Cari no. tagihan / pelanggan…" @keydown.enter="loadBills()" @search="loadBills()" />
-          <select v-model="filters.status" class="input" @change="loadBills()">
-            <option value="terbuka">Belum lunas</option>
-            <option value="jatuh_tempo">Lewat jatuh tempo</option>
-            <option value="belum">Belum dibayar</option>
-            <option value="sebagian">Dibayar sebagian</option>
-            <option value="lunas">Lunas</option>
-            <option value="">Semua</option>
-          </select>
-          <input v-model="filters.period" type="month" class="input" @change="loadBills()" />
+          <AppSelect
+            v-model="filters.status"
+            class="input"
+            :options="[
+              { value: 'terbuka', label: 'Belum lunas' },
+              { value: 'jatuh_tempo', label: 'Lewat jatuh tempo' },
+              { value: 'belum', label: 'Belum dibayar' },
+              { value: 'sebagian', label: 'Dibayar sebagian' },
+              { value: 'lunas', label: 'Lunas' },
+              { value: '', label: 'Semua' },
+            ]"
+            @change="loadBills()"
+          />
+          <DateInput v-model="filters.period" type="month" class="input" placeholder="Semua periode" clearable @change="loadBills()" />
         </div>
 
         <div class="card overflow-hidden">
@@ -209,7 +216,7 @@ onMounted(() => loadBills())
       <div class="space-y-4 text-sm">
         <div>
           <label class="label">Periode</label>
-          <input v-model="generateForm.period" type="month" class="input" :class="{ 'input-error': generateErrors.period }" />
+          <DateInput v-model="generateForm.period" type="month" class="input" :class="{ 'input-error': generateErrors.period }" />
           <p v-if="generateErrors.period" class="error-text">{{ generateErrors.period }}</p>
           <p class="mt-1 text-xs text-slate-500">Semua bon yang belum ditagih sampai akhir periode ini (atau sampai hari ini untuk bulan berjalan) akan dimasukkan.</p>
         </div>

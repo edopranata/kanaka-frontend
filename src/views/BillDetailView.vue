@@ -4,14 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, tanggal } from '../utils/format'
-import { headerLines } from '../utils/escpos'
+import { rupiah, tanggal } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import BankSelect from '../components/BankSelect.vue'
+import BillDocument from '../components/BillDocument.vue'
 import AppModal from '../components/AppModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
-import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../stores/confirm'
@@ -95,60 +94,8 @@ onMounted(load)
     </PageHeader>
 
     <template v-if="bill">
-      <!-- Dokumen tagihan (juga untuk dicetak) -->
-      <section class="card p-5 sm:p-8 print:border-0 print:p-0 print:shadow-none">
-        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
-          <div>
-            <p class="text-lg font-bold text-slate-900">{{ meta.store.name }}</p>
-            <p v-for="(line, index) in headerLines(meta.store)" :key="index" class="text-sm text-slate-500">{{ line }}</p>
-          </div>
-          <div class="text-right">
-            <p class="text-2xl font-bold tracking-wide text-brand-700">TAGIHAN</p>
-            <p class="font-medium">{{ bill.number }}</p>
-            <StatusBadge :status="bill.is_overdue ? 'jatuh_tempo' : bill.status" class="mt-1" />
-          </div>
-        </div>
-
-        <div class="grid gap-4 border-b border-slate-200 py-5 text-sm sm:grid-cols-2">
-          <div>
-            <p class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Kepada</p>
-            <p class="mt-1 font-semibold text-slate-900">{{ bill.customer.name }}</p>
-            <p v-if="bill.customer.address" class="text-slate-600">{{ bill.customer.address }}</p>
-            <p v-if="bill.customer.phone" class="text-slate-600">{{ bill.customer.phone }}</p>
-          </div>
-          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 sm:justify-self-end">
-            <dt class="text-slate-500">Periode</dt><dd class="text-right font-medium">{{ periodLabel(bill.period) }}</dd>
-            <dt class="text-slate-500">Tanggal tagihan</dt><dd class="text-right">{{ tanggal(bill.issue_date, 'long') }}</dd>
-            <dt class="text-slate-500">Jatuh tempo</dt><dd class="text-right font-medium" :class="{ 'text-red-600': bill.is_overdue }">{{ tanggal(bill.due_date, 'long') }}</dd>
-          </dl>
-        </div>
-
-        <div class="table-wrap -mx-5 sm:mx-0">
-          <table v-stack class="table">
-            <thead>
-              <tr><th>Tanggal</th><th>No. Bon</th><th>Barang</th><th class="num">Jumlah</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="sale in bill.sales" :key="sale.id">
-                <td>{{ tanggal(sale.business_date) }}</td>
-                <td>
-                  <RouterLink :to="{ name: 'sale', params: { id: sale.id } }" class="text-brand-700 hover:underline print:text-slate-800">{{ sale.number }}</RouterLink>
-                </td>
-                <td class="whitespace-normal">
-                  <span v-for="(item, index) in sale.items" :key="item.id">{{ item.product_name }}{{ item.variant ? ` ${item.variant}` : '' }} ({{ number(item.qty) }} {{ item.unit }}){{ index < sale.items.length - 1 ? ', ' : '' }}</span>
-                </td>
-                <td class="num">{{ rupiah(sale.total, false) }}</td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr><td colspan="3" class="text-right">Total tagihan</td><td class="num">{{ rupiah(bill.total) }}</td></tr>
-              <tr><td colspan="3" class="text-right">Sudah dibayar</td><td class="num">{{ rupiah(bill.paid) }}</td></tr>
-              <tr><td colspan="3" class="text-right">Sisa tagihan</td><td class="num text-base text-brand-700">{{ rupiah(bill.remaining) }}</td></tr>
-            </tfoot>
-          </table>
-        </div>
-        <p class="mt-6 hidden text-sm text-slate-600 print:block">Mohon melakukan pembayaran sebelum tanggal jatuh tempo. Terima kasih.</p>
-      </section>
+      <!-- Dokumen tagihan (juga untuk dicetak); template di Pengaturan → Toko & Struk → Nota tagihan -->
+      <BillDocument :bill="bill" :store="meta.store" :template="meta.invoice" />
 
       <!-- Riwayat pembayaran -->
       <section class="card mt-4 overflow-hidden print:mt-6 print:border-0 print:shadow-none">

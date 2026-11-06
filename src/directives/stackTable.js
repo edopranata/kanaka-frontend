@@ -2,6 +2,7 @@
  * v-stack: di layar kecil setiap baris tabel ditampilkan sebagai kartu.
  * Label tiap sel diambil otomatis dari judul kolom (thead) ke atribut data-label.
  * Baris tfoot berbentuk "keterangan (colspan) + nilai" ditandai .stack-split agar tampil sebaris.
+ * v-stack="false": tetap tabel biasa (mis. pratinjau dokumen A4).
  */
 function label(el) {
   const headers = []
@@ -23,11 +24,12 @@ function label(el) {
 }
 
 export default {
-  mounted(el) {
+  mounted(el, { value }) {
+    if (value === false) return
     el.classList.add('table-stack')
     label(el)
   },
-  updated(el) {
-    label(el)
+  updated(el, { value }) {
+    if (value !== false) label(el)
   },
 }

@@ -4,7 +4,8 @@ import { useLoadingStore } from '../stores/loading'
 export const TOKEN_KEY = 'penjualan.token'
 
 const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  // Frontend selalu disajikan Laravel di domain yang sama dengan API.
+  baseURL: '/api/v1',
   headers: { Accept: 'application/json' },
 })
 

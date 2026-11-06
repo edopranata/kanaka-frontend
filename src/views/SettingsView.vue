@@ -7,10 +7,12 @@ import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
+import AppModal from '../components/AppModal.vue'
 import AppSelect from '../components/AppSelect.vue'
 import NumberInput from '../components/NumberInput.vue'
 import ReceiptPreview from '../components/ReceiptPreview.vue'
-import { columnsFor, receiptBytes, sampleSale } from '../utils/escpos'
+import InvoicePreview from '../components/InvoicePreview.vue'
+import { columnsFor, headerLines, receiptBytes, sampleSale } from '../utils/escpos'
 import { taxLabel } from '../utils/format'
 import { printerConfig } from '../utils/printer'
 
@@ -36,15 +38,33 @@ const setFooter = (text) => (footer.value = String(text || '').split('\n').filte
 const HEADER_WIDTH = 48
 const addressSplit = ref(false)
 
+// Toko & Struk dibagi dua: struk thermal dan nota tagihan (A4).
+const storeTab = ref('receipt')
+const invoiceZoom = ref(false)
+const invoiceTemplate = computed(() => ({
+  title: form.value?.invoice_title,
+  header_name: form.value?.invoice_header_name,
+  header_lines: form.value?.invoice_header_lines,
+  footer: form.value?.invoice_footer,
+  signer: form.value?.invoice_signer,
+  signer_title: form.value?.invoice_signer_title,
+}))
+
 // Pratinjau struk utuh: transaksi contoh dicetak lewat perintah ESC/POS yang sama dengan printer, memakai isian
 // yang belum disimpan. Kertas mengikuti "Ukuran kertas struk" (bawaan untuk perangkat tanpa pengaturan printer).
 const previewKind = ref('tunai')
 const previewColumns = computed(() => columnsFor(form.value?.receipt_paper))
+// Identitas toko dari isian (belum disimpan), dipakai pratinjau struk & nota tagihan.
+const previewStore = computed(() => {
+  const f = form.value
+  if (!f) return {}
+  const contact = f.receipt_contact === 'email' ? (f.store_email ? `Email: ${f.store_email}` : '') : f.store_phone ? `Telp. ${f.store_phone}` : ''
+  return { name: f.store_name, address: f.store_address, address2: f.store_address2, contact, header_gap: f.receipt_header_gap, receipt_footer: footer.value.join('\n') }
+})
 const previewBytes = computed(() => {
   const f = form.value
   if (!f) return new Uint8Array()
-  const contact = f.receipt_contact === 'email' ? (f.store_email ? `Email: ${f.store_email}` : '') : f.store_phone ? `Telp. ${f.store_phone}` : ''
-  const store = { name: f.store_name, address: f.store_address, address2: f.store_address2, contact, header_gap: f.receipt_header_gap, receipt_footer: footer.value.join('\n') }
+  const store = previewStore.value
   const sale = sampleSale({
     number: docPreview(f.prefix_sale || 'INV'),
     cashier: auth.user?.name || 'Kasir',
@@ -120,7 +140,7 @@ const errorTabs = computed(() => {
   const keys = Object.keys(errors.value)
   const fields = {
     app: ['app_name', 'app_tagline', 'report_'],
-    store: ['store_', 'receipt_'],
+    store: ['store_', 'receipt_', 'invoice_'],
     numbering: ['prefix_', 'doc_number', 'sku_', 'package_sku'],
     transaction: ['tax_', 'default_', 'package_default', 'expense_categories', 'allow_negative'],
     closing: ['auto_closing', 'auto_billing', 'bill_due_days', 'cash_account_'],
@@ -289,7 +309,15 @@ onMounted(async () => {
           </section>
 
           <!-- Toko & struk -->
-          <section v-else-if="tab === 'store'" key="store" class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_auto]">
+          <section v-else-if="tab === 'store'" key="store" class="space-y-5">
+            <div class="segmented max-w-sm">
+              <button v-for="item in [{ key: 'receipt', label: 'Struk', icon: 'receipt', fields: ['store_', 'receipt_'] }, { key: 'invoice', label: 'Nota tagihan', icon: 'document', fields: ['invoice_'] }]" :key="item.key" type="button" class="tab gap-1.5" :class="{ 'tab-active': storeTab === item.key }" @click="storeTab = item.key">
+                <AppIcon :name="item.icon" :size="16" class="shrink-0" /> {{ item.label }}
+                <span v-if="Object.keys(errors).some((key) => item.fields.some((field) => key.startsWith(field)))" class="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+              </button>
+            </div>
+
+            <div v-show="storeTab === 'receipt'" class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_auto]">
             <div class="card space-y-5 p-5">
               <h2 class="font-semibold">Identitas toko & struk</h2>
               <div class="space-y-3">
@@ -384,6 +412,79 @@ onMounted(async () => {
               </div>
               <p class="text-xs text-slate-500">Transaksi contoh, langsung mengikuti isian sebelum disimpan. Tampilan sama dengan cetakan printer thermal; jarak feed &amp; garis potong mengikuti pengaturan printer perangkat ini.</p>
             </aside>
+            </div>
+
+            <!-- Nota tagihan (A4) -->
+            <div v-if="storeTab === 'invoice'" class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+              <div class="card space-y-5 p-5">
+                <div>
+                  <h2 class="font-semibold">Nota tagihan</h2>
+                  <p class="text-sm text-slate-500">Dokumen A4 di menu Tagihan &amp; Piutang (tombol Cetak Tagihan).</p>
+                </div>
+                <div>
+                  <label class="label" for="invoice-title">Judul dokumen</label>
+                  <input id="invoice-title" v-model="form.invoice_title" class="input max-w-xs uppercase" :class="{ 'input-error': errors.invoice_title }" maxlength="30" placeholder="TAGIHAN" required @input="form.invoice_title = form.invoice_title.toUpperCase()" />
+                  <p v-if="errors.invoice_title" class="error-text">{{ errors.invoice_title }}</p>
+                </div>
+
+                <div class="space-y-3 border-t border-slate-100 pt-5">
+                  <p class="label mb-0">Header</p>
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500" for="invoice-header-name">Nama</label>
+                    <input id="invoice-header-name" v-model="form.invoice_header_name" class="input" :class="{ 'input-error': errors.invoice_header_name }" maxlength="100" :placeholder="form.store_name" />
+                    <p v-if="errors.invoice_header_name" class="error-text">{{ errors.invoice_header_name }}</p>
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500" for="invoice-header-lines">Baris di bawah nama</label>
+                    <textarea id="invoice-header-lines" v-model="form.invoice_header_lines" rows="3" class="input" :class="{ 'input-error': errors.invoice_header_lines }" maxlength="300" :placeholder="headerLines(previewStore).join('\n') || 'mis. alamat, telepon / WA, NPWP'" />
+                    <p v-if="errors.invoice_header_lines" class="error-text">{{ errors.invoice_header_lines }}</p>
+                  </div>
+                  <p class="text-xs text-slate-500">Kosongkan untuk memakai identitas toko di tab Struk. Maks. 4 baris.</p>
+                </div>
+
+                <div class="border-t border-slate-100 pt-5">
+                  <label class="label" for="invoice-footer">Catatan kaki</label>
+                  <textarea id="invoice-footer" v-model="form.invoice_footer" rows="4" class="input" :class="{ 'input-error': errors.invoice_footer }" maxlength="1000" placeholder="mis. Pembayaran transfer ke BRI 0123-01-000000-50-1 a.n. Koperasi" />
+                  <p v-if="errors.invoice_footer" class="error-text">{{ errors.invoice_footer }}</p>
+                  <p v-else class="mt-1 text-xs text-slate-500">Maks. 10 baris, mis. ketentuan pembayaran & rekening tujuan transfer.</p>
+                </div>
+
+                <div class="border-t border-slate-100 pt-5">
+                  <p class="label">Tanda tangan</p>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <input v-model="form.invoice_signer" class="input" :class="{ 'input-error': errors.invoice_signer }" maxlength="60" placeholder="Nama, mis. Sherly" aria-label="Nama penanda tangan" />
+                      <p v-if="errors.invoice_signer" class="error-text">{{ errors.invoice_signer }}</p>
+                    </div>
+                    <div>
+                      <input v-model="form.invoice_signer_title" class="input" :class="{ 'input-error': errors.invoice_signer_title }" maxlength="60" placeholder="Jabatan, mis. Bendahara" aria-label="Jabatan penanda tangan" />
+                      <p v-if="errors.invoice_signer_title" class="error-text">{{ errors.invoice_signer_title }}</p>
+                    </div>
+                  </div>
+                  <p class="mt-1 text-xs text-slate-500">Kosongkan nama bila nota tanpa kolom tanda tangan.</p>
+                </div>
+              </div>
+
+              <aside class="card space-y-3 p-4 xl:sticky xl:top-20">
+                <div class="flex items-center justify-between gap-3">
+                  <h2 class="font-semibold">Pratinjau nota tagihan <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">A4</span></h2>
+                  <button type="button" class="btn-secondary btn-sm" @click="invoiceZoom = true"><AppIcon name="eye" :size="14" /> Perbesar</button>
+                </div>
+                <div class="rounded-lg bg-slate-100 p-3">
+                  <div class="bg-white shadow-sm ring-1 ring-slate-200">
+                    <InvoicePreview :store="previewStore" :template="invoiceTemplate" :due-days="Number(form.bill_due_days) || 10" />
+                  </div>
+                </div>
+                <p class="text-xs text-slate-500">Tagihan contoh, langsung mengikuti isian sebelum disimpan.</p>
+              </aside>
+              <AppModal v-if="invoiceZoom" title="Pratinjau nota tagihan" size="xl" @close="invoiceZoom = false">
+                <div class="rounded-lg bg-slate-100 p-3">
+                  <div class="bg-white shadow-sm ring-1 ring-slate-200">
+                    <InvoicePreview :store="previewStore" :template="invoiceTemplate" :due-days="Number(form.bill_due_days) || 10" />
+                  </div>
+                </div>
+              </AppModal>
+            </div>
           </section>
 
           <!-- Penomoran & kode -->

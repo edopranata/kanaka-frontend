@@ -9,6 +9,7 @@ import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import DateInput from '../components/DateInput.vue'
+import UnitQtyInput from '../components/UnitQtyInput.vue'
 import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../stores/confirm'
 
@@ -50,6 +51,7 @@ function addProduct(product) {
     name: product.name,
     sku: product.sku,
     unit: product.unit,
+    units: product.units || [],
     stock: product.stock,
     qty: 1,
     actual_qty: product.stock,
@@ -109,8 +111,8 @@ async function save() {
   <div class="stagger">
     <PageHeader :title="isOpname ? 'Stok Opname' : 'Penyesuaian Stok'" :subtitle="isOpname ? 'Masukkan hasil hitung fisik; selisih otomatis dicatat' : 'Catat barang masuk/keluar di luar pembelian & penjualan'" :back="{ name: 'adjustments' }" />
 
-    <div class="grid gap-5 lg:grid-cols-3">
-      <section class="card space-y-4 p-5">
+    <div class="grid grid-cols-1 gap-5 2xl:grid-cols-3">
+      <section class="card grid gap-4 self-start p-5 sm:grid-cols-2 2xl:grid-cols-1">
         <div>
           <label class="label">Jenis</label>
           <div class="segmented">
@@ -135,7 +137,7 @@ async function save() {
         </div>
       </section>
 
-      <section class="card lg:col-span-2">
+      <section class="card 2xl:col-span-2">
         <div class="flex flex-wrap gap-2 border-b border-slate-100 p-4">
           <div class="min-w-60 flex-1"><ProductSearch include-inactive type="barang" @select="addProduct" /></div>
           <button v-if="isOpname" class="btn-secondary" :disabled="loadingAll" @click="loadAllProducts">
@@ -150,21 +152,21 @@ async function save() {
             </thead>
             <tbody>
               <tr v-for="(item, index) in form.items" :key="item.product_id">
-                <td>
+                <td class="min-w-36 whitespace-normal">
                   <p class="font-medium">{{ item.name }}</p>
                   <p class="text-xs text-slate-500">{{ item.sku }}</p>
-                  <p v-if="errors[`items.${index}.qty`]" class="error-text">{{ errors[`items.${index}.qty`] }}</p>
+                  <p v-if="errors[`items.${index}.qty`] || errors[`items.${index}.actual_qty`]" class="error-text">{{ errors[`items.${index}.qty`] || errors[`items.${index}.actual_qty`] }}</p>
                 </td>
                 <td class="num">{{ number(item.stock) }} {{ item.unit }}</td>
                 <template v-if="isOpname">
-                  <td class="num"><input v-model.number="item.actual_qty" type="number" min="0" class="input ml-auto w-24 text-right" @focus="$event.target.select()" /></td>
+                  <td class="num"><UnitQtyInput v-model="item.actual_qty" :units="item.units" :base-unit="item.unit" mixed compact class="ml-auto w-full max-w-64 text-left sm:min-w-52" /></td>
                   <td class="num font-semibold" :class="difference(item) < 0 ? 'text-red-600' : difference(item) > 0 ? 'text-emerald-600' : 'text-slate-400'">
-                    {{ difference(item) > 0 ? '+' : '' }}{{ number(difference(item)) }}
+                    {{ difference(item) > 0 ? '+' : '' }}{{ number(difference(item)) }} {{ item.unit }}
                   </td>
                 </template>
                 <template v-else>
-                  <td class="num"><input v-model.number="item.qty" type="number" min="1" class="input ml-auto w-24 text-right" /></td>
-                  <td class="num">{{ number(item.stock + (form.type === 'masuk' ? 1 : -1) * (item.qty || 0)) }}</td>
+                  <td class="num"><UnitQtyInput v-model="item.qty" :units="item.units" :base-unit="item.unit" compact class="ml-auto w-full max-w-60 text-left sm:min-w-48" /></td>
+                  <td class="num">{{ number(item.stock + (form.type === 'masuk' ? 1 : -1) * (item.qty || 0)) }} {{ item.unit }}</td>
                 </template>
                 <td><button class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" @click="form.items.splice(index, 1)"><AppIcon name="trash" :size="16" /></button></td>
               </tr>

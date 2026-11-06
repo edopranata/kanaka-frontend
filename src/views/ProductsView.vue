@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
@@ -16,6 +16,7 @@ import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import NumberInput from '../components/NumberInput.vue'
+import UnitQtyInput from '../components/UnitQtyInput.vue'
 import { confirmDialog } from '../stores/confirm'
 
 const auth = useAuthStore()
@@ -31,6 +32,7 @@ const can = {
   import: auth.can('products.import'),
   categories: auth.can('categories.manage'),
   cost: auth.can('profit.view'),
+  opname: auth.can('stock.opname'),
 }
 /** Harga & satuan jual dikunci saat mengubah produk tanpa hak "Ubah harga jual". */
 const priceLocked = (form) => Boolean(form?.id) && !can.price
@@ -73,6 +75,10 @@ async function loadCategories() {
 const emptyForm = () => ({
   id: null, sku: '', barcode: '', name: '', category_id: '', unit: meta.defaults.unit,
   cost_price: 0, min_stock: meta.defaults.min_stock, initial_stock: 0, is_active: true,
+  // HPP boleh diisi per satuan besar (mis. per BKS) lalu dibagi isinya; tersimpan per satuan dasar.
+  cost_unit: 1, cost_input: 0,
+  // Stok awal yang masih bisa dikoreksi (dari API), null bila tidak bisa.
+  correctable_initial: null, initial_stock_correction: null,
   units: [{ id: null, name: meta.defaults.unit, conversion: 1, barcode: '', sell_price: 0 }],
 })
 const nextSku = ref('')
@@ -92,11 +98,41 @@ function openForm(product = null) {
   if (!units.some((unit) => unit.conversion === 1)) {
     units.unshift({ id: null, name: product.unit, conversion: 1, barcode: '', sell_price: 0 })
   }
-  form.value = { ...emptyForm(), ...product, category_id: product.category_id || '', cost_price: Math.round(product.cost_price || 0), units }
+  form.value = {
+    ...emptyForm(),
+    ...product,
+    category_id: product.category_id || '',
+    cost_price: product.cost_price || 0,
+    initial_stock: 0,
+    cost_unit: 1,
+    cost_input: 0,
+    correctable_initial: product.initial_stock ?? null,
+    initial_stock_correction: product.initial_stock ?? null,
+    units,
+  }
 }
 
 /** Stok awal boleh diisi untuk produk baru, atau produk lama yang belum pernah punya mutasi stok (mis. hasil import). */
 const canSetInitialStock = (form) => !form.id || (form.has_movements === false && !form.consignor)
+/** Stok awal yang salah input bisa dikoreksi selama belum ada transaksi lain (butuh hak Stok opname). */
+const canCorrectInitialStock = (form) => Boolean(form.id) && !canSetInitialStock(form) && form.correctable_initial !== null && can.opname
+
+// ---- HPP per satuan pilihan ----
+const costUnits = (form) => [{ name: form.unit, conversion: 1 }, ...form.units.filter((unit) => unit.conversion > 1 && unit.name)]
+const costUnit = (form) => costUnits(form).find((unit) => unit.conversion === form.cost_unit) || costUnits(form)[0]
+const decimal = (value) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(value)
+
+watch(() => form.value?.cost_unit, (conversion, previous) => {
+  if (!form.value || conversion === previous || conversion === 1) return
+  form.value.cost_input = Math.round(form.value.cost_price * conversion)
+})
+watch(() => form.value?.cost_input, (value) => {
+  if (form.value && form.value.cost_unit > 1) form.value.cost_price = Math.round((value / form.value.cost_unit) * 100) / 100
+})
+// Satuan HPP yang dihapus / diubah isinya kembali ke satuan dasar.
+watch(() => form.value && costUnits(form.value).map((unit) => unit.conversion).join(','), () => {
+  if (form.value && !costUnits(form.value).some((unit) => unit.conversion === form.value.cost_unit)) form.value.cost_unit = 1
+})
 
 // ---- Satuan & harga jual ----
 const baseUnit = (form) => form.units.find((unit) => unit.conversion === 1)
@@ -137,6 +173,10 @@ async function save() {
       .map((unit) => ({ ...unit, name: unit.conversion === 1 ? form.value.unit : unit.name, barcode: unit.conversion === 1 ? null : unit.barcode || null })),
   }
   if (payload.id && !canSetInitialStock(form.value)) delete payload.initial_stock
+  if (!canCorrectInitialStock(form.value)) delete payload.initial_stock_correction
+  delete payload.cost_unit
+  delete payload.cost_input
+  delete payload.correctable_initial
   if (!can.cost) delete payload.cost_price
   try {
     if (payload.id) {
@@ -363,9 +403,15 @@ onMounted(() => {
           <p class="mt-1 text-xs text-slate-500">Stok & HPP dihitung dalam satuan ini.</p>
         </div>
         <div v-if="can.cost">
-          <label class="label">HPP per {{ form.unit || 'satuan' }}</label>
-          <MoneyInput v-model="form.cost_price" :invalid="!!errors.cost_price" />
-          <p class="mt-1 text-xs text-slate-500">Diperbarui otomatis (rata-rata) setiap ada pembelian.</p>
+          <label class="label">HPP per {{ costUnit(form).name || 'satuan' }}</label>
+          <div class="flex gap-2">
+            <MoneyInput v-if="form.cost_unit === 1" v-model="form.cost_price" :decimals="2" :invalid="!!errors.cost_price" class="min-w-0 flex-1" />
+            <MoneyInput v-else v-model="form.cost_input" :invalid="!!errors.cost_price" class="min-w-0 flex-1" />
+            <AppSelect v-if="costUnits(form).length > 1" v-model="form.cost_unit" class="input w-28 shrink-0" :options="costUnits(form)" value-key="conversion" label-key="name" :searchable="false" aria-label="Satuan HPP" />
+          </div>
+          <p v-if="form.cost_unit > 1" class="mt-1 text-xs text-slate-500">= Rp {{ decimal(form.cost_price) }} per {{ form.unit }} (dibagi isi {{ number(form.cost_unit) }})</p>
+          <p v-else class="mt-1 text-xs text-slate-500">Diperbarui otomatis (rata-rata) setiap ada pembelian.</p>
+          <p v-if="errors.cost_price" class="error-text">{{ errors.cost_price }}</p>
         </div>
         <datalist id="unit-names"><option v-for="unit in ['PCS', 'BKS', 'BTL', 'SCT', 'KOTAK', 'BOX', 'DUS', 'PAK', 'RENTENG', 'LUSIN', 'KRAT', 'KG', 'LTR', 'SAK']" :key="unit" :value="unit" /></datalist>
 
@@ -425,10 +471,19 @@ onMounted(() => {
           <NumberInput v-model="form.min_stock" :min="0" />
         </div>
         <div v-if="canSetInitialStock(form)">
-          <label class="label">Stok awal ({{ form.unit || 'satuan dasar' }})</label>
-          <NumberInput v-model="form.initial_stock" :min="0" :invalid="!!errors.initial_stock" />
+          <label class="label">Stok awal</label>
+          <UnitQtyInput v-model="form.initial_stock" :units="form.units" :base-unit="form.unit || 'PCS'" :invalid="!!errors.initial_stock" />
           <p v-if="errors.initial_stock" class="error-text">{{ errors.initial_stock }}</p>
           <p v-else-if="form.id" class="mt-1 text-xs text-slate-500">Belum ada transaksi — stok awal bisa diisi sekali, dicatat di kartu stok dengan HPP di atas.</p>
+        </div>
+        <div v-else-if="canCorrectInitialStock(form)">
+          <label class="label">Stok awal <span class="font-normal text-slate-400">(bisa dikoreksi)</span></label>
+          <UnitQtyInput v-model="form.initial_stock_correction" :units="form.units" :base-unit="form.unit" :invalid="!!errors.initial_stock_correction" />
+          <p v-if="errors.initial_stock_correction" class="error-text">{{ errors.initial_stock_correction }}</p>
+          <p v-else class="mt-1 text-xs text-slate-500">
+            Tercatat {{ number(form.correctable_initial) }} {{ form.unit }}. Belum ada transaksi lain, jadi stok awal yang salah input masih bisa diperbaiki (HPP di kartu stok ikut disesuaikan).
+            Setelah ada transaksi, gunakan Stok Opname.
+          </p>
         </div>
         <div v-else>
           <label class="label">Stok saat ini</label>

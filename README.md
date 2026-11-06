@@ -65,6 +65,13 @@ Windows (contoh Rongta RPP02N): nyalakan printer → **Settings → Bluetooth & 
   (bisa dibeli/distok) tetapi **tidak muncul dan tidak bisa dijual di kasir**.
 - Barcode satuan (mis. barcode dus) langsung memilih satuan tersebut saat discan di kasir.
 - Pembelian boleh per satuan besar: beli 2 DUS isi 24 seharga Rp 60.000/DUS → stok +48 PCS, HPP Rp 2.500/PCS.
+- Stok awal, penyesuaian masuk/keluar, dan opname juga bisa diisi per satuan (mis. 33 BKS = 11.550 GRM untuk kopi isi
+  350 GRM); opname boleh campuran (mis. 32 BKS + 120 GRM). Bila jumlah dalam satuan dasar kurang dari satu satuan besar
+  yang isinya ≥ 50 (mis. "33 GRM"), muncul peringatan "Maksud Anda 33 BKS?".
+- HPP bisa diisi per satuan besar (mis. Rp 50.000 per BKS → Rp 142,86 per GRM); HPP disimpan per satuan dasar dengan 2 desimal.
+- **Koreksi stok awal**: selama stok awal masih satu-satunya mutasi produk (belum ada jual, beli, penyesuaian, titipan),
+  jumlahnya bisa diperbaiki di form ubah produk oleh pengguna dengan hak *Stok opname* (tercatat di Log Aktivitas).
+  Setelah ada transaksi, gunakan Stok Opname.
 
 ## Kode produk (SKU) & kategori otomatis
 
@@ -330,6 +337,7 @@ php artisan serve --port=8020
 php artisan schedule:work
 
 # Frontend: http://localhost:5174 (API di-proxy ke backend :8020)
+# (frontend tidak memakai file .env; bila backend di port lain, ubah target proxy di frontend/vite.config.js)
 cd ../frontend
 npm install
 npm run dev
@@ -361,12 +369,12 @@ Test backend: `cd backend && php artisan test`
    ```
    npm run build:laravel
    ```
+   Tidak perlu file `.env` di frontend: alamat API otomatis `/api/v1` (satu domain dengan Laravel).
    Aset (JS/CSS, service worker PWA, manifest, ikon) masuk ke `backend/public`, sedangkan `index.html` ke
    `backend/resources/spa/index.html`. `routes/web.php` menyajikan halaman itu untuk semua alamat di luar `/api`,
    jadi `/kas`, `/pembelian/5`, dll. bisa dibuka langsung / di-refresh. Cukup deploy folder `backend`
    (document root = `backend/public`). Jalankan ulang perintah ini setiap ada perubahan frontend; file build lama
    dibersihkan otomatis. Tanpa build, halaman `/` menampilkan halaman bawaan Laravel.
 4. **Frontend terpisah** (alternatif): `npm run build`, lalu upload isi `frontend/dist/` ke web server.
-   - Domain sama (SPA di `/`, `/api` diteruskan ke Laravel): biarkan `VITE_API_URL=/api/v1`.
-   - Domain berbeda: set `VITE_API_URL=https://api.tokoanda.com/api/v1` sebelum build dan atur CORS di Laravel.
+   - Harus satu domain dengan API: frontend selalu memanggil `/api/v1`, jadi `/api` perlu diteruskan ke Laravel.
    - Arahkan semua path yang tidak ditemukan ke `index.html` (SPA fallback).

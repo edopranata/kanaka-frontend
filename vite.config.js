@@ -1,15 +1,14 @@
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
   const proxy = {
     '/api': {
-      target: env.VITE_PROXY_TARGET || 'http://localhost:8020',
+      target: 'http://localhost:8020',
       changeOrigin: true,
     },
   }
@@ -52,9 +51,9 @@ export default defineConfig(({ mode }) => {
         devOptions: { enabled: false },
       }),
     ],
-    // "npm run build:laravel": hasil build langsung ke backend/public (lihat scripts/build-laravel.mjs).
+    // "npm run build:laravel": hasil build langsung ke backend/public (LARAVEL_PATH diisi scripts/build-laravel.mjs).
     build: mode === 'laravel'
-      ? { outDir: env.LARAVEL_PATH ? `${env.LARAVEL_PATH}/public` : fileURLToPath(new URL('../backend/public', import.meta.url)), emptyOutDir: false }
+      ? { outDir: process.env.LARAVEL_PATH ? `${process.env.LARAVEL_PATH}/public` : fileURLToPath(new URL('../backend/public', import.meta.url)), emptyOutDir: false }
       : {},
     server: { port: 5174, proxy },
     preview: { port: 4174, proxy },

@@ -1,4 +1,4 @@
-import { number, rupiah, tanggal } from './format'
+import { itemName, number, rupiah, tanggal } from './format'
 import { invoiceHeader, periodLabel, textLines } from './invoice'
 
 /**
@@ -74,7 +74,7 @@ export async function buildBillPdf(bill, { store, template = {}, printedAt = new
     body: bill.sales.map((sale) => [
       tanggal(sale.business_date),
       sale.number,
-      sale.items.map((item) => `${item.product_name}${item.variant ? ` ${item.variant}` : ''} (${number(item.qty)} ${item.unit})`).join(', '),
+      sale.items.map((item) => `${itemName(item)}${item.variant ? ` ${item.variant}` : ''} (${number(item.qty)} ${item.unit})`).join(', '),
       rupiah(sale.total, false),
     ]),
     foot: totals.map(([label, value]) => [{ content: label, colSpan: 3, styles: { halign: 'right' } }, value]),

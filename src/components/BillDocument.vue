@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { number, rupiah, tanggal } from '../utils/format'
+import { itemName, number, rupiah, tanggal } from '../utils/format'
 import { invoiceHeader, periodLabel, textLines } from '../utils/invoice'
 import StatusBadge from './StatusBadge.vue'
 
@@ -63,7 +63,7 @@ const footer = computed(() => textLines(props.template.footer))
               <RouterLink v-else :to="{ name: 'sale', params: { id: sale.id } }" class="text-brand-700 hover:underline print:text-slate-800">{{ sale.number }}</RouterLink>
             </td>
             <td class="whitespace-normal">
-              <span v-for="(item, index) in sale.items" :key="item.id">{{ item.product_name }}{{ item.variant ? ` ${item.variant}` : '' }} ({{ number(item.qty) }} {{ item.unit }}){{ index < sale.items.length - 1 ? ', ' : '' }}</span>
+              <span v-for="(item, index) in sale.items" :key="item.id">{{ itemName(item) }}{{ item.variant ? ` ${item.variant}` : '' }} ({{ number(item.qty) }} {{ item.unit }}){{ index < sale.items.length - 1 ? ', ' : '' }}</span>
             </td>
             <td class="num">{{ rupiah(sale.total, false) }}</td>
           </tr>

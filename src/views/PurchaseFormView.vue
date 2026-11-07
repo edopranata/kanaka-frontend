@@ -172,7 +172,7 @@ onMounted(async () => {
 
       <section class="card lg:col-span-2">
         <div class="border-b border-slate-100 p-4">
-          <ProductSearch include-inactive show-price="cost" type="barang" @select="addProduct" />
+          <ProductSearch include-inactive show-price="cost" type="barang" ownership="ksu" @select="addProduct" />
           <p v-if="errors.items" class="error-text">{{ errors.items }}</p>
         </div>
         <div class="table-wrap">

@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, today } from '../utils/format'
+import { number, rupiah, supplierLabel, today } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -20,11 +20,15 @@ const errors = ref({})
 const saving = ref(false)
 
 function addProduct(product) {
-  if (product.consignor && form.supplier_id && product.consignor.id !== Number(form.supplier_id)) {
+  if (!product.consignor) {
+    toast.error(`${product.name} adalah barang milik KSU, bukan barang titipan.`)
+    return
+  }
+  if (form.supplier_id && product.consignor.id !== Number(form.supplier_id)) {
     toast.error(`${product.name} adalah titipan dari ${product.consignor.name}.`)
     return
   }
-  if (!form.supplier_id && product.consignor) form.supplier_id = product.consignor.id
+  if (!form.supplier_id) form.supplier_id = product.consignor.id
   const line = form.items.find((item) => item.product_id === product.id)
   if (line) {
     line.qty++
@@ -77,7 +81,7 @@ onMounted(async () => {
       <section class="card space-y-4 p-5">
         <div>
           <label class="label">Supplier (penitip)</label>
-          <AppSelect v-model="form.supplier_id" class="input" :class="{ 'input-error': errors.supplier_id }" :options="suppliers" value-key="id" label-key="name" empty="— Pilih supplier —" />
+          <AppSelect v-model="form.supplier_id" class="input" :class="{ 'input-error': errors.supplier_id }" :options="suppliers" value-key="id" :label-key="supplierLabel" empty="— Pilih supplier —" />
           <p v-if="errors.supplier_id" class="error-text">{{ errors.supplier_id }}</p>
         </div>
         <div>
@@ -89,13 +93,13 @@ onMounted(async () => {
           <textarea v-model="form.notes" rows="2" class="input" placeholder="Mis. titipan pagi" />
         </div>
         <p class="rounded-lg bg-sky-50 p-3 text-xs text-sky-800">
-          Produk titipan tidak bisa dibeli lewat menu Pembelian dan hanya boleh dititipkan oleh satu supplier. Harga setor menjadi HPP produk.
+          Hanya barang yang ditandai <b>Barang titipan</b> dari supplier ini (atur di menu <RouterLink :to="{ name: 'products' }" class="underline">Produk</RouterLink>). Barang titipan tidak bisa dibeli lewat Pembelian maupun disesuaikan lewat Penyesuaian Stok; harga setor menjadi HPP produk.
         </p>
       </section>
 
       <section class="card">
         <div class="border-b border-slate-100 p-4">
-          <ProductSearch include-inactive type="barang" show-price="cost" placeholder="Cari / scan barang titipan…" @select="addProduct" />
+          <ProductSearch include-inactive type="barang" ownership="titipan" :consignor-id="form.supplier_id || null" show-price="cost" placeholder="Cari / scan barang titipan…" @select="addProduct" />
           <p v-if="errors.items" class="error-text">{{ errors.items }}</p>
         </div>
         <div class="table-wrap">

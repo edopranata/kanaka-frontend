@@ -160,9 +160,14 @@ Kasir tidak lagi mengisi diskon manual. Potongan hanya berasal dari menu **Disko
 
 ## Barang titipan (konsinyasi)
 
-1. **Titipan masuk** (menu *Barang Titipan → Titipan Masuk*): pilih supplier, barang, jumlah, dan harga setor. Stok bertambah,
-   HPP mengikuti harga setor. **Belum menjadi hutang.** Produk ditandai sebagai titipan supplier tersebut (tidak bisa dibeli
-   lewat menu Pembelian dan tidak bisa dititipkan supplier lain).
+0. **Tandai produknya**: di form Produk centang **Barang titipan** dan pilih **penitipnya** (satu produk = satu penitip;
+   kerupuk dari 2 supplier = 2 produk; stok minimum otomatis 0). Supplier boleh punya **kode 2 huruf/angka** (opsional,
+   tombol *Acak* atau isi sendiri, mis. `H2`) yang dicetak di depan nama barang titipannya pada struk & nota: *H2 Nasi Putih*. Barang titipan tidak punya stok awal dan tidak bisa lewat Pembelian maupun
+   Penyesuaian / Opname; barang milik KSU tidak bisa lewat Titipan Masuk. Kepemilikan hanya bisa diubah saat stok 0 dan
+   semua titipannya sudah diselesaikan. Daftar produk & laporan Persediaan bisa difilter *Milik KSU / Barang titipan*
+   (laporan Persediaan bawaannya hanya milik KSU, sehingga nilai persediaan = aset toko).
+1. **Titipan masuk** (menu *Barang Titipan → Titipan Masuk*): pilih supplier, barang titipannya, jumlah, dan harga setor.
+   Stok bertambah, HPP mengikuti harga setor. **Belum menjadi hutang.**
 2. **Jual seperti biasa** (kasir, bon, atau sebagai bahan paket, mis. lauk pada paket makan siang).
 3. **Penyelesaian** kapan saja (harian untuk lauk, beberapa hari sekali untuk kerupuk): isi **sisa fisik** dan **jumlah retur**.
    - Dibayar = titipan terbuka − sisa fisik (terjual atau hilang). Selisih stok sistem dicatat otomatis.

@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import http, { errorMessage } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, tanggal, taxLabel, waktu } from '../utils/format'
+import { itemName, number, rupiah, tanggal, taxLabel, waktu } from '../utils/format'
 import { printReceipt } from '../utils/print'
 import AppIcon from '../components/AppIcon.vue'
 import ConfirmReason from '../components/ConfirmReason.vue'
@@ -75,7 +75,7 @@ onMounted(load)
             <tbody>
               <tr v-for="item in sale.items" :key="item.id">
                 <td class="font-medium">
-                  {{ item.product_name }}
+                  {{ itemName(item) }}
                   <p v-if="item.variant" class="text-xs font-normal text-slate-500">{{ item.variant }}</p>
                 </td>
                 <td class="num">

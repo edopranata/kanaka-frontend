@@ -52,7 +52,22 @@ async function load(page = 1) {
 
 function openForm(contact = null) {
   errors.value = {}
-  form.value = contact ? { ...contact } : { id: null, name: '', phone: '', address: '', notes: '', credit_limit: 0 }
+  form.value = contact ? { ...contact, code: contact.code || '' } : { id: null, code: '', name: '', phone: '', address: '', notes: '', credit_limit: 0 }
+}
+
+// Kode supplier (opsional, 2 huruf/angka): prefix barang titipan di struk. Bawaan kosong; "Acak" mengambil kode yang belum dipakai.
+const codeBusy = ref(false)
+async function randomCode() {
+  codeBusy.value = true
+  try {
+    const { data } = await http.get('/suppliers/next-code')
+    form.value.code = data.code
+    delete errors.value.code
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    codeBusy.value = false
+  }
 }
 
 async function save() {
@@ -105,10 +120,11 @@ onMounted(() => load())
       <div class="table-wrap">
         <table v-stack class="table">
           <thead>
-            <tr><th>Nama</th><th>Telepon</th><th>Alamat</th><th v-if="type === 'customers'" class="num">Batas Kredit</th><th>Catatan</th><th></th></tr>
+            <tr><th v-if="type === 'suppliers'">Kode</th><th>Nama</th><th>Telepon</th><th>Alamat</th><th v-if="type === 'customers'" class="num">Batas Kredit</th><th>Catatan</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="contact in contacts" :key="contact.id">
+              <td v-if="type === 'suppliers'"><span v-if="contact.code" class="rounded bg-sky-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-sky-700 ring-1 ring-sky-600/20">{{ contact.code }}</span><span v-else class="text-slate-400">-</span></td>
               <td class="font-medium">{{ contact.name }}</td>
               <td>{{ contact.phone || '-' }}</td>
               <td class="max-w-64 truncate">{{ contact.address || '-' }}</td>
@@ -132,6 +148,15 @@ onMounted(() => load())
           <label class="label">Nama</label>
           <input v-model="form.name" class="input" :class="{ 'input-error': errors.name }" required />
           <p v-if="errors.name" class="error-text">{{ errors.name }}</p>
+        </div>
+        <div v-if="type === 'suppliers'">
+          <label class="label" for="supplier-code">Kode <span class="font-normal text-slate-400">(opsional)</span></label>
+          <div class="flex gap-2">
+            <input id="supplier-code" v-model="form.code" class="input w-24 text-center font-mono tracking-widest uppercase" :class="{ 'input-error': errors.code }" maxlength="2" placeholder="—" autocomplete="off" @input="form.code = form.code.toUpperCase().replace(/[^A-Z0-9]/g, '')" />
+            <button type="button" class="btn-secondary" :disabled="codeBusy" @click="randomCode"><AppIcon name="refresh" :size="16" /> Acak</button>
+          </div>
+          <p v-if="errors.code" class="error-text">{{ errors.code }}</p>
+          <p v-else class="mt-1 text-xs text-slate-500">2 huruf / angka, dicetak di depan nama barang titipannya pada struk, mis. <b>{{ form.code || 'H2' }} Nasi Putih</b>. Kosongkan bila tanpa kode.</p>
         </div>
         <div>
           <label class="label">Telepon</label>

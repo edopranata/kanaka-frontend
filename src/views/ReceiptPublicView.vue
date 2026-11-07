@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import http from '../api/http'
 import { footerLines, headerLines, promoLabel } from '../utils/escpos'
-import { number, rupiah, taxLabel, waktu } from '../utils/format'
+import { itemName, number, rupiah, taxLabel, waktu } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 
 /**
@@ -59,7 +59,7 @@ onMounted(async () => {
       <div class="my-3 border-t border-dashed border-slate-300" />
       <ul class="space-y-2">
         <li v-for="item in sale.items" :key="item.id">
-          <p class="font-medium">{{ item.product_name }}</p>
+          <p class="font-medium">{{ itemName(item) }}</p>
           <p v-if="item.variant" class="pl-3 text-xs text-slate-500">({{ item.variant }})</p>
           <p class="flex justify-between gap-3 pl-3">
             <span>{{ item.qty }} {{ item.unit }} × {{ number(item.price) }}</span>

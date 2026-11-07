@@ -1,6 +1,7 @@
 <script setup>
 import { onBeforeUnmount, ref } from 'vue'
 import http from '../api/http'
+import { useToastStore } from '../stores/toast'
 import { number, rupiah } from '../utils/format'
 import ScanButton from './ScanButton.vue'
 
@@ -13,6 +14,10 @@ const props = defineProps({
   type: { type: String, default: '' },
   /** Sertakan produk nonaktif (tidak tampil di kasir) — untuk bahan paket, pembelian, dan stok. */
   includeInactive: { type: Boolean, default: false },
+  /** ksu: hanya barang milik KSU (pembelian, stok); titipan: hanya barang titipan (titipan masuk). Kosong = semua. */
+  ownership: { type: String, default: '' },
+  /** Dengan ownership="titipan": hanya titipan supplier ini. */
+  consignorId: { type: [Number, String], default: null },
 })
 const emit = defineEmits(['select'])
 
@@ -22,10 +27,25 @@ const open = ref(false)
 const highlighted = ref(0)
 const input = ref(null)
 let timer = null
+const toast = useToastStore()
+
+const ownershipParams = () => ({
+  consigned: props.ownership === 'ksu' ? 0 : props.ownership === 'titipan' ? 1 : undefined,
+  consignor_id: props.ownership === 'titipan' && props.consignorId ? props.consignorId : undefined,
+})
+
+/** Alasan produk hasil scan / kode persis tidak boleh dipilih di sini (beda jenis atau kepemilikan). */
+function mismatch(product) {
+  if (props.type && product.type !== props.type) return `${product.name} bukan ${props.type === 'paket' ? 'paket' : 'barang'}`
+  if (props.ownership === 'ksu' && product.consignor) return `${product.name} adalah barang titipan — catat lewat menu Barang Titipan`
+  if (props.ownership === 'titipan' && !product.consignor) return `${product.name} adalah barang milik KSU, bukan barang titipan`
+  if (props.ownership === 'titipan' && props.consignorId && product.consignor.id !== Number(props.consignorId)) return `${product.name} adalah titipan dari ${product.consignor.name}`
+  return null
+}
 
 async function search() {
   const { data } = await http.get('/products', {
-    params: { search: term.value, active: props.includeInactive ? undefined : 1, per_page: 10, type: props.type || undefined },
+    params: { search: term.value, active: props.includeInactive ? undefined : 1, per_page: 10, type: props.type || undefined, ...ownershipParams() },
   })
   results.value = data.data
   highlighted.value = 0
@@ -49,20 +69,26 @@ async function onEnter() {
   if (open.value && results.value[highlighted.value]) {
     return choose(results.value[highlighted.value])
   }
+  let found = null
   try {
-    const { data } = await http.get('/products/lookup', { params: { code, include_inactive: props.includeInactive ? 1 : undefined } })
-    if (props.type && data.data.type !== props.type) throw new Error('type')
-    choose({ ...data.data, matched_unit_id: data.matched_unit_id })
+    found = await http.get('/products/lookup', { params: { code, include_inactive: props.includeInactive ? 1 : undefined } })
   } catch {
-    await search()
+    return search()
   }
+  const reason = mismatch(found.data.data)
+  if (reason) {
+    toast.error(`${reason}.`)
+    return
+  }
+  choose({ ...found.data.data, matched_unit_id: found.data.matched_unit_id })
 }
 
 /** Hasil scan kamera: kode persis langsung dipilih; ditampilkan di pemindai (nama produk / tidak ditemukan). */
 async function scan(code) {
   try {
     const { data } = await http.get('/products/lookup', { params: { code, include_inactive: props.includeInactive ? 1 : undefined } })
-    if (props.type && data.data.type !== props.type) return { ok: false, text: `${data.data.name} bukan ${props.type === 'paket' ? 'paket' : 'barang'}` }
+    const reason = mismatch(data.data)
+    if (reason) return { ok: false, text: reason }
     choose({ ...data.data, matched_unit_id: data.matched_unit_id })
     return { ok: true, text: data.data.name }
   } catch {

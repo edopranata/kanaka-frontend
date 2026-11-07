@@ -19,6 +19,12 @@ export function percent(value) {
  * Label pajak, mis. "PPN 11%" atau "PB1 10,5%", dari tax_name & tax_percent transaksi (atau pengaturan).
  * Transaksi lama tanpa data tarif cukup "Pajak".
  */
+/** Nama supplier dengan kodenya bila ada, mis. "H2 · Bu Heny" (pilihan penitip). */
+export const supplierLabel = (supplier) => (supplier?.code ? `${supplier.code} · ${supplier.name}` : supplier?.name || '')
+
+/** Nama barang di struk & nota; barang titipan diawali kode penitipnya, mis. "H2 Nasi Putih". */
+export const itemName = (item) => (item.consignor_code ? `${item.consignor_code} ${item.product_name}` : item.product_name)
+
 export function taxLabel({ tax_name: name, tax_percent: rate } = {}) {
   const value = rate === null || rate === undefined || rate === '' ? '' : ` ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(Number(rate))}%`
   return `${name || 'Pajak'}${value}`

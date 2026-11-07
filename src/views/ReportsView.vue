@@ -19,7 +19,9 @@ const toast = useToastStore()
 const types = ref([])
 const active = ref(null)
 const categories = ref([])
-const filters = reactive({ from: monthStart(), to: today(), category_id: '', low_stock: false })
+// Persediaan: bawaan hanya barang milik KSU (nilai persediaan = aset toko).
+const filters = reactive({ from: monthStart(), to: today(), category_id: '', low_stock: false, ownership: 'ksu' })
+const ownershipOptions = [{ value: 'ksu', label: 'Milik KSU' }, { value: 'titipan', label: 'Barang titipan' }]
 const report = ref(null)
 const loading = ref(false)
 const exporting = ref(false)
@@ -33,6 +35,7 @@ const params = computed(() => ({
   to: current.value?.dated ? filters.to : undefined,
   category_id: ['products', 'stock'].includes(active.value) && filters.category_id ? filters.category_id : undefined,
   low_stock: active.value === 'stock' && filters.low_stock ? 1 : undefined,
+  ownership: active.value === 'stock' && filters.ownership ? filters.ownership : undefined,
 }))
 
 async function load() {
@@ -107,6 +110,10 @@ onMounted(async () => {
       <div v-if="['products', 'stock'].includes(active)">
         <label class="label text-xs">Kategori</label>
         <AppSelect v-model="filters.category_id" class="input" :options="categories" value-key="id" label-key="name" empty="Semua kategori" @change="load()" />
+      </div>
+      <div v-if="active === 'stock'">
+        <label class="label text-xs">Kepemilikan</label>
+        <AppSelect v-model="filters.ownership" class="input" :options="ownershipOptions" empty="Semua (milik KSU & titipan)" @change="load()" />
       </div>
       <label v-if="active === 'stock'" class="flex items-center gap-2 pb-2 text-sm">
         <input v-model="filters.low_stock" type="checkbox" class="h-4 w-4 rounded border-slate-300" @change="load" /> Hanya stok menipis

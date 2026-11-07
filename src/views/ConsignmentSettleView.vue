@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, tanggal } from '../utils/format'
+import { number, rupiah, supplierLabel, tanggal } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import BankSelect from '../components/BankSelect.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -119,7 +119,7 @@ onMounted(async () => {
     <div class="card mb-4 flex flex-wrap items-end gap-3 p-4">
       <div class="min-w-64 flex-1">
         <label class="label">Supplier</label>
-        <AppSelect v-model="supplierId" class="input" :options="suppliers" value-key="id" label-key="name" empty="— Pilih supplier —" />
+        <AppSelect v-model="supplierId" class="input" :options="suppliers" value-key="id" :label-key="supplierLabel" empty="— Pilih supplier —" />
       </div>
       <div v-if="lines.length" class="flex flex-wrap gap-2">
         <button type="button" class="btn-secondary" @click="returnAll"><AppIcon name="back" :size="16" /> Retur semua sisa</button>

@@ -5,7 +5,7 @@ import http, { errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah } from '../utils/format'
+import { number, rupiah, supplierLabel } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import ScanButton from '../components/ScanButton.vue'
 import AppModal from '../components/AppModal.vue'
@@ -33,6 +33,7 @@ const can = {
   categories: auth.can('categories.manage'),
   cost: auth.can('profit.view'),
   opname: auth.can('stock.opname'),
+  suppliers: ['suppliers.view', 'purchases.view', 'consignments.view'].some((permission) => auth.can(permission)),
 }
 /** Harga & satuan jual dikunci saat mengubah produk tanpa hak "Ubah harga jual". */
 const priceLocked = (form) => Boolean(form?.id) && !can.price
@@ -43,11 +44,15 @@ const activeOptions = [
   { value: '0', label: 'Nonaktif' },
   { value: '', label: 'Semua status' },
 ]
+const ownershipOptions = [
+  { value: '0', label: 'Milik KSU' },
+  { value: '1', label: 'Barang titipan' },
+]
 const sellableOptions = [
   { value: '1', label: 'Sudah ada harga jual' },
   { value: '0', label: 'Belum ada harga jual' },
 ]
-const filters = reactive({ search: '', category_id: '', low_stock: route.query.low_stock === '1' ? 1 : 0, sellable: '', active: route.query.active ?? '1' })
+const filters = reactive({ search: '', category_id: '', consigned: '', low_stock: route.query.low_stock === '1' ? 1 : 0, sellable: '', active: route.query.active ?? '1' })
 const products = ref([])
 const pagination = ref(null)
 const categories = ref([])
@@ -77,6 +82,8 @@ const emptyForm = () => ({
   cost_price: 0, min_stock: meta.defaults.min_stock, initial_stock: 0, is_active: true,
   // HPP boleh diisi per satuan besar (mis. per BKS) lalu dibagi isinya; tersimpan per satuan dasar.
   cost_unit: 1, cost_input: 0,
+  // Barang titipan (konsinyasi): stok hanya lewat menu Barang Titipan; consignor_id = penitip.
+  is_consignment: false, consignor_id: null,
   // Stok awal yang masih bisa dikoreksi (dari API), null bila tidak bisa.
   correctable_initial: null, initial_stock_correction: null,
   units: [{ id: null, name: meta.defaults.unit, conversion: 1, barcode: '', sell_price: 0 }],
@@ -88,6 +95,7 @@ const saving = ref(false)
 
 function openForm(product = null) {
   errors.value = {}
+  loadSuppliers()
   if (!product) {
     form.value = emptyForm()
     nextSku.value = ''
@@ -106,6 +114,8 @@ function openForm(product = null) {
     initial_stock: 0,
     cost_unit: 1,
     cost_input: 0,
+    is_consignment: Boolean(product.consignor),
+    consignor_id: product.consignor?.id ?? null,
     correctable_initial: product.initial_stock ?? null,
     initial_stock_correction: product.initial_stock ?? null,
     units,
@@ -113,7 +123,30 @@ function openForm(product = null) {
 }
 
 /** Stok awal boleh diisi untuk produk baru, atau produk lama yang belum pernah punya mutasi stok (mis. hasil import). */
-const canSetInitialStock = (form) => !form.id || (form.has_movements === false && !form.consignor)
+const canSetInitialStock = (form) => !form.is_consignment && (!form.id || (form.has_movements === false && !form.consignor))
+/** Milik KSU ↔ titipan hanya saat stok 0 (server juga memeriksa titipan yang belum diselesaikan). */
+const ownerLocked = (form) => Boolean(form.id) && Number(form.stock) !== 0
+
+/**
+ * Barang titipan biasanya habis setiap hari, jadi stok minimum menjadi 0 (tidak memicu "stok menipis"); bila centang
+ * dilepas, kembali ke nilai sebelum dicentang. Hanya saat diklik, bukan saat form dibuka.
+ */
+function toggleConsignment(form) {
+  if (form.is_consignment) {
+    form.min_stock_before = form.min_stock
+    form.min_stock = 0
+  } else {
+    form.min_stock = form.min_stock_before ?? meta.defaults.min_stock
+  }
+}
+
+// Penitip barang titipan (dimuat saat form dibuka, bila boleh melihat supplier).
+const suppliers = ref([])
+watch(() => form.value?.consignor_id, (id) => id && delete errors.value.consignor_id)
+function loadSuppliers() {
+  if (!can.suppliers || suppliers.value.length) return
+  http.get('/suppliers', { params: { per_page: 200 } }).then(({ data }) => (suppliers.value = data.data)).catch(() => {})
+}
 /** Stok awal yang salah input bisa dikoreksi selama belum ada transaksi lain (butuh hak Stok opname). */
 const canCorrectInitialStock = (form) => Boolean(form.id) && !canSetInitialStock(form) && form.correctable_initial !== null && can.opname
 
@@ -162,8 +195,12 @@ function unitInfo(form, unit) {
 const unitError = (index, field) => errors.value[`units.${index}.${field}`]
 
 async function save() {
-  saving.value = true
   errors.value = {}
+  if (form.value.is_consignment && !form.value.consignor_id) {
+    errors.value = { consignor_id: 'Pilih penitip barang titipan ini.' }
+    return
+  }
+  saving.value = true
   const payload = {
     ...form.value,
     category_id: form.value.category_id || null,
@@ -177,6 +214,9 @@ async function save() {
   delete payload.cost_unit
   delete payload.cost_input
   delete payload.correctable_initial
+  delete payload.is_consignment
+  delete payload.min_stock_before
+  payload.consignor_id = form.value.is_consignment ? form.value.consignor_id : null
   if (!can.cost) delete payload.cost_price
   try {
     if (payload.id) {
@@ -281,7 +321,7 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div class="card mb-4 grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-6">
+    <div class="card mb-4 grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       <div class="relative sm:col-span-2">
         <input v-model="filters.search" type="search" class="input pr-11" placeholder="Cari nama / SKU / scan barcode…" @keydown.enter="load()" @search="load()" />
         <ScanButton class="absolute top-1/2 right-1.5 h-8 w-8 -translate-y-1/2" title="Cari produk" @detected="filters.search = $event; filters.active = ''; load()" />
@@ -289,6 +329,7 @@ onMounted(() => {
       <AppSelect v-model="filters.active" class="input" :options="activeOptions" @change="load()" />
       <AppSelect v-model="filters.sellable" class="input" :options="sellableOptions" empty="Semua produk" @change="load()" />
       <AppSelect v-model="filters.category_id" class="input" :options="categories" value-key="id" label-key="name" empty="Semua kategori" @change="load()" />
+      <AppSelect v-model="filters.consigned" class="input" :options="ownershipOptions" empty="Semua kepemilikan" @change="load()" />
       <label class="flex items-center gap-2 text-sm">
         <input v-model="filters.low_stock" type="checkbox" :true-value="1" :false-value="0" class="h-4 w-4 rounded border-slate-300" @change="load()" />
         Hanya stok menipis
@@ -316,7 +357,7 @@ onMounted(() => {
                 <p class="text-xs text-slate-400">
                   {{ product.sku }}<template v-if="product.barcode && product.barcode !== product.sku"> · {{ product.barcode }}</template>
                 </p>
-                <p v-if="product.consignor" class="mt-0.5 text-xs text-sky-700">Titipan: {{ product.consignor.name }}</p>
+                <p v-if="product.consignor" class="mt-0.5 text-xs text-sky-700">Titipan: {{ supplierLabel(product.consignor) }}</p>
               </td>
               <td class="stack-hide">{{ product.category || '-' }}</td>
               <td v-if="can.cost" class="num">{{ rupiah(product.cost_price, false) }}</td>
@@ -410,10 +451,28 @@ onMounted(() => {
             <AppSelect v-if="costUnits(form).length > 1" v-model="form.cost_unit" class="input w-28 shrink-0" :options="costUnits(form)" value-key="conversion" label-key="name" :searchable="false" aria-label="Satuan HPP" />
           </div>
           <p v-if="form.cost_unit > 1" class="mt-1 text-xs text-slate-500">= Rp {{ decimal(form.cost_price) }} per {{ form.unit }} (dibagi isi {{ number(form.cost_unit) }})</p>
-          <p v-else class="mt-1 text-xs text-slate-500">Diperbarui otomatis (rata-rata) setiap ada pembelian.</p>
+          <p v-else class="mt-1 text-xs text-slate-500">{{ form.is_consignment ? 'Mengikuti harga setor saat titipan masuk.' : 'Diperbarui otomatis (rata-rata) setiap ada pembelian.' }}</p>
           <p v-if="errors.cost_price" class="error-text">{{ errors.cost_price }}</p>
         </div>
         <datalist id="unit-names"><option v-for="unit in ['PCS', 'BKS', 'BTL', 'SCT', 'KOTAK', 'BOX', 'DUS', 'PAK', 'RENTENG', 'LUSIN', 'KRAT', 'KG', 'LTR', 'SAK']" :key="unit" :value="unit" /></datalist>
+
+        <!-- Kepemilikan: milik KSU atau barang titipan -->
+        <div class="rounded-xl border p-4 sm:col-span-2" :class="form.is_consignment ? 'border-sky-200 bg-sky-50/50' : 'border-slate-200'">
+          <label class="flex items-start gap-2 text-sm" :class="{ 'opacity-60': ownerLocked(form) }">
+            <input v-model="form.is_consignment" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" :disabled="ownerLocked(form)" @change="toggleConsignment(form)" />
+            <span>
+              <b>Barang titipan</b> (konsinyasi)
+              <span class="block text-xs text-slate-500">Milik supplier / rekanan. Stok hanya lewat menu Barang Titipan (titipan masuk &amp; penyelesaian), tidak lewat Pembelian, stok awal, maupun Penyesuaian / Opname.</span>
+            </span>
+          </label>
+          <div v-if="form.is_consignment" class="mt-3 max-w-sm pl-6">
+            <label class="label">Penitip</label>
+            <AppSelect v-if="suppliers.length" v-model="form.consignor_id" class="input" :class="{ 'input-error': errors.consignor_id }" :options="suppliers" value-key="id" :label-key="supplierLabel" placeholder="Pilih supplier / rekanan" :disabled="ownerLocked(form)" />
+            <p v-else class="input bg-slate-50">{{ supplierLabel(form.consignor) || 'Butuh hak akses melihat supplier' }}</p>
+          </div>
+          <p v-if="errors.consignor_id" class="error-text pl-6">{{ errors.consignor_id }}</p>
+          <p v-else-if="ownerLocked(form)" class="mt-2 pl-6 text-xs text-slate-500">Kepemilikan hanya bisa diubah saat stok 0 dan semua titipan sudah diselesaikan.</p>
+        </div>
 
         <!-- Satuan & harga jual -->
         <div class="rounded-xl border border-slate-200 sm:col-span-2">
@@ -469,6 +528,7 @@ onMounted(() => {
         <div>
           <label class="label">Stok minimum (peringatan)</label>
           <NumberInput v-model="form.min_stock" :min="0" />
+          <p v-if="form.is_consignment" class="mt-1 text-xs text-slate-500">Barang titipan: 0 agar tidak selalu muncul sebagai stok menipis.</p>
         </div>
         <div v-if="canSetInitialStock(form)">
           <label class="label">Stok awal</label>
@@ -488,7 +548,7 @@ onMounted(() => {
         <div v-else>
           <label class="label">Stok saat ini</label>
           <p class="input bg-slate-50">{{ number(form.stock) }} {{ form.unit }}</p>
-          <p class="mt-1 text-xs text-slate-500">Ubah stok lewat Pembelian atau Penyesuaian Stok.</p>
+          <p class="mt-1 text-xs text-slate-500">{{ form.is_consignment ? 'Stok barang titipan lewat menu Barang Titipan → Titipan Masuk.' : 'Ubah stok lewat Pembelian atau Penyesuaian Stok.' }}</p>
         </div>
         <label class="flex items-start gap-2 text-sm sm:col-span-2">
           <input v-model="form.is_active" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />

@@ -1,6 +1,6 @@
 <script setup>
 import { useMetaStore } from '../stores/meta'
-import { number, taxLabel, waktu } from '../utils/format'
+import { itemName, number, taxLabel, waktu } from '../utils/format'
 import { computed } from 'vue'
 import { renderSVG } from 'uqr'
 import { footerLines, headerGap, headerLines, promoLabel } from '../utils/escpos'
@@ -35,7 +35,7 @@ const qrSvg = computed(() => {
         <p v-if="sale.customer">Plg: {{ sale.customer.name }}</p>
         <hr />
         <div v-for="item in sale.items" :key="item.id" class="item">
-          <p>{{ item.product_name }}</p>
+          <p>{{ itemName(item) }}</p>
           <p v-if="item.variant">&nbsp;&nbsp;({{ item.variant }})</p>
           <p class="row">
             <span>{{ item.qty }} {{ item.unit }} x {{ number(item.price) }}</span>

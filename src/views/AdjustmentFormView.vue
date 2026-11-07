@@ -67,7 +67,7 @@ async function loadAllProducts() {
     let page = 1
     let lastPage = 1
     do {
-      const { data } = await http.get('/products', { params: { in_use: 1, type: 'barang', per_page: 200, page } })
+      const { data } = await http.get('/products', { params: { in_use: 1, type: 'barang', consigned: 0, per_page: 200, page } })
       data.data.forEach(addProduct)
       lastPage = data.meta.last_page
       page++
@@ -139,7 +139,7 @@ async function save() {
 
       <section class="card 2xl:col-span-2">
         <div class="flex flex-wrap gap-2 border-b border-slate-100 p-4">
-          <div class="min-w-60 flex-1"><ProductSearch include-inactive type="barang" @select="addProduct" /></div>
+          <div class="min-w-60 flex-1"><ProductSearch include-inactive type="barang" ownership="ksu" @select="addProduct" /></div>
           <button v-if="isOpname" class="btn-secondary" :disabled="loadingAll" @click="loadAllProducts">
             <AppIcon name="download" :size="16" /> {{ loadingAll ? 'Memuat…' : 'Muat semua produk berstok' }}
           </button>

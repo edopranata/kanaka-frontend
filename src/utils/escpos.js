@@ -1,5 +1,5 @@
 import { encode } from 'uqr'
-import { number, taxLabel, waktu } from './format'
+import { itemName, number, taxLabel, waktu } from './format'
 
 /**
  * Penyusun perintah ESC/POS untuk printer thermal (Rongta, Epson, Xprinter, dll.).
@@ -210,7 +210,7 @@ export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl
   doc.separator()
 
   for (const item of sale.items || []) {
-    doc.wrap(item.product_name).forEach((line) => doc.line(line))
+    doc.wrap(itemName(item)).forEach((line) => doc.line(line))
     if (item.variant) doc.wrap(`  (${item.variant})`).forEach((line) => doc.line(line))
     doc.pair(`  ${item.qty} ${item.unit} x ${number(item.price)}`, number(item.qty * item.price))
     if (item.discount) doc.pair(`  ${promoLabel(item)}`, `-${number(item.discount)}`)

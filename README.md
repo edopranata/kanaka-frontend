@@ -22,7 +22,7 @@ kanaka/
 | --- | --- |
 | **Kasir (POS)** | Scan barcode / cari produk, keranjang, **promo otomatis** (tanpa input diskon manual), pajak (opsional), bayar tunai (hitung kembalian) / transfer / QRIS / kartu, cetak struk thermal 58/80mm, pelanggan. Shortcut: `F2` cari, `F8` bayar, `Enter` transaksi baru. |
 | **Penjualan kredit (bon)** | Menu terpisah dari kasir untuk "ambil dulu bayar nanti": pilih pelanggan, input barang (per satuan), cetak nota bon. Batas kredit per pelanggan (opsional). |
-| **Tagihan & piutang** | Tagihan bulanan per pelanggan dibuat **otomatis setiap tanggal 1 pukul 01:00** (atau manual kapan saja), cetak tagihan A4, pembayaran lunas/dicicil, saldo piutang per pelanggan, peringatan lewat jatuh tempo. |
+| **Tagihan & piutang** | Tagihan bulanan per pelanggan dibuat **otomatis setiap tanggal 1 pukul 01:00** (atau manual kapan saja), cetak tagihan A4 & unduh PDF, pembayaran lunas/dicicil, saldo piutang per pelanggan, peringatan lewat jatuh tempo. |
 | **Diskon & promo** | Potongan persen atau nominal per satuan untuk produk tertentu (bisa dibatasi satuan tertentu, mis. hanya BOX), dengan periode mulai–berakhir dan minimal beli. Otomatis diterapkan di kasir & bon. |
 | **Riwayat penjualan** | Filter tanggal/status/metode, detail, cetak ulang struk, **void** (stok kembali, wajib alasan). |
 | **Produk & kategori** | Master produk (SKU, barcode, kategori, satuan dasar, HPP, stok minimum) terpisah dari **satuan & harga jual**: satu produk bisa dijual per PCS, BOX isi 6, DUS isi 40, dst. dengan harga masing-masing (harga grosir tidak harus = isi × harga eceran) dan barcode per satuan. Import dari Excel (format iPOS). |

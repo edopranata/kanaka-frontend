@@ -5,6 +5,8 @@ import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { rupiah, tanggal } from '../utils/format'
+import { downloadBillPdf } from '../utils/billPdf'
+import { periodLabel } from '../utils/invoice'
 import AppIcon from '../components/AppIcon.vue'
 import BankSelect from '../components/BankSelect.vue'
 import BillDocument from '../components/BillDocument.vue'
@@ -26,7 +28,18 @@ const payForm = ref(null)
 const payErrors = ref({})
 const paying = ref(false)
 const print = () => window.print()
-const periodLabel = (period) => new Date(`${period}-01T00:00:00`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+const pdfBusy = ref(false)
+
+async function downloadPdf() {
+  pdfBusy.value = true
+  try {
+    await downloadBillPdf(bill.value, { store: meta.store, template: meta.invoice })
+  } catch (e) {
+    toast.error(`PDF gagal dibuat: ${e?.message || e}`)
+  } finally {
+    pdfBusy.value = false
+  }
+}
 
 async function load() {
   try {
@@ -88,6 +101,7 @@ onMounted(load)
     <PageHeader :title="bill?.number || 'Detail Tagihan'" :subtitle="bill ? `${bill.customer.name} · ${periodLabel(bill.period)}` : ''" :back="{ name: 'bills' }" class="no-print">
       <template v-if="bill" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak Tagihan</button>
+        <button class="btn-secondary" :disabled="pdfBusy" @click="downloadPdf"><AppIcon name="download" :size="16" /> {{ pdfBusy ? 'Membuat PDF…' : 'Unduh PDF' }}</button>
         <button v-if="bill.paid === 0 && auth.can('bills.delete')" class="btn-secondary text-red-600" @click="cancelBill"><AppIcon name="ban" :size="16" /> Batalkan</button>
         <button v-if="bill.remaining > 0 && auth.can('bills.pay')" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Catat Pembayaran</button>
       </template>

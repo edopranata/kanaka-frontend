@@ -27,24 +27,24 @@ const periodLabel = (period) => new Date(`${period}-01T00:00:00`).toLocaleDateSt
   <section :class="preview ? 'bg-white p-8' : 'card p-5 sm:p-8 print:border-0 print:p-0 print:shadow-none'">
     <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
       <div class="min-w-0">
-        <p class="text-lg font-bold text-slate-900">{{ name }}</p>
-        <p v-for="(line, index) in header" :key="index" class="text-sm text-slate-500">{{ line }}</p>
+        <p class="text-lg leading-tight font-bold text-slate-900">{{ name }}</p>
+        <p v-for="(line, index) in header" :key="index" class="text-sm leading-tight text-slate-500">{{ line }}</p>
       </div>
       <div class="text-right">
-        <p class="text-2xl font-bold tracking-wide text-brand-700">{{ template.title || 'TAGIHAN' }}</p>
-        <p class="font-medium">{{ bill.number }}</p>
+        <p class="text-2xl leading-tight font-bold tracking-wide text-brand-700">{{ template.title || 'TAGIHAN' }}</p>
+        <p class="leading-tight font-medium">{{ bill.number }}</p>
         <StatusBadge :status="bill.is_overdue ? 'jatuh_tempo' : bill.status" class="mt-1" />
       </div>
     </div>
 
     <div class="grid gap-4 border-b border-slate-200 py-5 text-sm sm:grid-cols-2" :class="{ 'grid-cols-2': preview }">
-      <div>
+      <div class="leading-snug">
         <p class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Kepada</p>
         <p class="mt-1 font-semibold text-slate-900">{{ bill.customer.name }}</p>
         <p v-if="bill.customer.address" class="text-slate-600">{{ bill.customer.address }}</p>
         <p v-if="bill.customer.phone" class="text-slate-600">{{ bill.customer.phone }}</p>
       </div>
-      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 sm:justify-self-end" :class="{ 'justify-self-end': preview }">
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 leading-snug sm:justify-self-end" :class="{ 'justify-self-end': preview }">
         <dt class="text-slate-500">Periode</dt><dd class="text-right font-medium">{{ periodLabel(bill.period) }}</dd>
         <dt class="text-slate-500">Tanggal tagihan</dt><dd class="text-right">{{ tanggal(bill.issue_date, 'long') }}</dd>
         <dt class="text-slate-500">Jatuh tempo</dt><dd class="text-right font-medium" :class="{ 'text-red-600': bill.is_overdue }">{{ tanggal(bill.due_date, 'long') }}</dd>
@@ -52,7 +52,8 @@ const periodLabel = (period) => new Date(`${period}-01T00:00:00`).toLocaleDateSt
     </div>
 
     <div class="table-wrap" :class="{ '-mx-5 sm:mx-0': !preview }">
-      <table v-stack="!preview" class="table">
+      <!-- Sel tabel lebih rapat dari tabel aplikasi biasa (dokumen cetak). -->
+      <table v-stack="!preview" class="table [&_td]:py-1.5 [&_th]:py-1.5">
         <thead>
           <tr><th>Tanggal</th><th>No. Bon</th><th>Barang</th><th class="num">Jumlah</th></tr>
         </thead>

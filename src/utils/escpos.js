@@ -379,6 +379,50 @@ export function billBytes(bill, { store, template = {}, columns, feed = 3, cut =
 }
 
 /**
+ * Bukti pembayaran piutang (per baris bon) untuk printer thermal: header & catatan kaki mengikuti pengaturan struk;
+ * baris yang dibayar dikelompokkan per bon, lalu total bayar, metode, dan sisa piutang pelanggan.
+ *
+ * @param {object} payment  data pembayaran dari API (/receivable-payments), termasuk items
+ * @param {{ store: object, columns: number, outstanding?: number|null, feed?: number, cut?: boolean }} options
+ */
+export function paymentBytes(payment, { store, columns, outstanding = null, feed = 3, cut = true }) {
+  const doc = new EscPos(columns)
+  header(doc, store).separator()
+  doc.bold(true).center('BUKTI PEMBAYARAN').bold(false)
+  doc.pair('No.', payment.number ?? '-')
+  doc.pair('Tanggal', payment.created_at ? waktu(payment.created_at) : dmy(payment.date))
+  doc.pair('Pelanggan', payment.customer?.name ?? '-')
+  doc.pair('Kasir', payment.user ?? '-')
+  doc.separator()
+
+  let current = null
+  for (const line of payment.items || []) {
+    if (line.sale_id !== current) {
+      if (current !== null) doc.line()
+      current = line.sale_id
+      doc.bold(true).wrap(`${line.sale_number} (${dmy(line.business_date)})`).forEach((text) => doc.line(text))
+      doc.bold(false)
+    }
+    doc.pair(`${line.qty} ${line.unit} ${lineName(line)}`, rp(line.amount))
+  }
+
+  doc.separator()
+  doc.bold(true).size(1, 2).pair('TOTAL BAYAR', rp(payment.amount)).size(1, 1).bold(false)
+  if (payment.received !== null && payment.received !== undefined) {
+    doc.pair(payment.payment_label || 'Tunai', rp(payment.received))
+    doc.pair('Kembali', rp(payment.change ?? 0))
+  } else {
+    doc.pair('Metode', payment.payment_label ?? '-')
+  }
+  if (outstanding !== null && outstanding !== undefined) doc.pair('Sisa piutang', rp(outstanding))
+  doc.separator()
+  footerLines(store.receipt_footer).forEach((line) => doc.center(line))
+  doc.feed(feed)
+  if (cut) doc.cut()
+  return doc.build()
+}
+
+/**
  * Transaksi contoh untuk "Cetak contoh struk" dan pratinjau struk di Pengaturan: 3 barang (satu kena promo).
  *
  * @param {{ number?: string, cashier?: string, taxName?: string, taxPercent?: number, credit?: boolean }} options

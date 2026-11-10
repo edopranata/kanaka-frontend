@@ -22,7 +22,7 @@ kanaka/
 | --- | --- |
 | **Kasir (POS)** | Scan barcode / cari produk, keranjang, **promo otomatis** (tanpa input diskon manual), pajak (opsional), bayar tunai (hitung kembalian) / transfer / QRIS / kartu, cetak struk thermal 58/80mm, pelanggan. Shortcut: `F2` cari, `F8` bayar, `Enter` transaksi baru. |
 | **Penjualan kredit (bon)** | Menu terpisah dari kasir untuk "ambil dulu bayar nanti": pilih pelanggan, input barang (per satuan), cetak nota bon. Batas kredit per pelanggan (opsional). |
-| **Tagihan & piutang** | Tagihan bulanan per pelanggan dibuat **otomatis setiap tanggal 1 pukul 01:00** (atau manual kapan saja), cetak tagihan A4, cetak thermal (per bon, header & catatan kaki seperti struk) & unduh PDF, pembayaran lunas/dicicil, saldo piutang per pelanggan, peringatan lewat jatuh tempo. |
+| **Tagihan & piutang** | Tagihan bulanan per pelanggan dibuat **otomatis setiap tanggal 1 pukul 01:00** (atau manual kapan saja), cetak tagihan A4, cetak thermal (per bon, header & catatan kaki seperti struk) & unduh PDF, **pembayaran per baris bon** (bayar sebagian / lunas, sebelum atau sesudah ditagih) dengan bukti bayar thermal & riwayat pembayaran, saldo piutang per pelanggan, peringatan lewat jatuh tempo. |
 | **Diskon & promo** | Potongan persen atau nominal per satuan untuk produk tertentu (bisa dibatasi satuan tertentu, mis. hanya BOX), dengan periode mulai–berakhir dan minimal beli. Otomatis diterapkan di kasir & bon. |
 | **Riwayat penjualan** | Filter tanggal/status/metode, detail, cetak ulang struk, **void** (stok kembali, wajib alasan). |
 | **Produk & kategori** | Master produk (SKU, barcode, kategori, satuan dasar, HPP, stok minimum) terpisah dari **satuan & harga jual**: satu produk bisa dijual per PCS, BOX isi 6, DUS isi 40, dst. dengan harga masing-masing (harga grosir tidak harus = isi × harga eceran) dan barcode per satuan. Import dari Excel (format iPOS). |
@@ -183,7 +183,12 @@ Kasir tidak lagi mengisi diskon manual. Potongan hanya berasal dari menu **Disko
 2. **Tagihan**: `php artisan bills:generate` dijadwalkan setiap tanggal 1 pukul 01:00 untuk semua bon bulan sebelumnya
    yang belum ditagih (satu tagihan per pelanggan). Bisa juga manual dari menu *Tagihan & Piutang* (semua pelanggan atau
    satu pelanggan, mis. yang ingin melunasi di tengah bulan). Jatuh tempo = tanggal tagihan + N hari (Pengaturan Toko).
-3. **Pembayaran**: boleh dicicil. Pembayaran tunai menambah *kas seharusnya* pada closing hari pembayaran.
+3. **Pembayaran per baris bon**: di *Tagihan & Piutang → Saldo per Pelanggan → Bayar sebagian* (atau *Catat Pembayaran* di
+   tagihan) centang baris bon yang dibayar — satu baris dibayar utuh, mis. hanya "2 PCS Indomie" di BON 2. Boleh sebelum
+   maupun sesudah ditagih; pajak bon dibagi proporsional ke barisnya. Metode dipilih lewat tombol seperti di kasir; untuk
+   tunai isi *Uang diterima* (ada tombol *Uang pas* & nominal cepat) dan kembalian dihitung otomatis, sedangkan kas hanya
+   bertambah sebesar yang dibayar. Pembayaran tunai menambah *kas seharusnya* pada closing hari itu. Bukti bayar bisa dicetak ke printer thermal; baris yang sudah dibayar ada di tab *Riwayat Pembayaran*
+   (bisa dibatalkan selama tanggalnya belum di-closing). Nomor pembayaran berprefix `BYR` (Pengaturan → Penomoran).
 4. **Closing harian** menampilkan bon sebagai penjualan pada hari barang diambil (baris "Bon (piutang)"), terpisah dari
    penjualan tunai, plus "Pelunasan piutang tunai".
 5. Bon yang sudah masuk tagihan tidak bisa di-void sebelum tagihannya dibatalkan; tagihan yang sudah ada pembayarannya

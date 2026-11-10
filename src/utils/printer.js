@@ -40,7 +40,8 @@ watch(printerConfig, (value) => {
 }, { deep: true })
 
 // status: '' (belum dicek) | checking | ready | unpaired (belum dipilih) | offline (tidak merespons / terputus)
-export const printerState = reactive({ connected: false, connecting: false, name: '', lastError: '', status: '', log: [] })
+// checkedAt: waktu (ms) cek printer terakhir selesai — mencegah cek berulang saat komponen status dipasang ulang.
+export const printerState = reactive({ connected: false, connecting: false, name: '', lastError: '', status: '', checkedAt: 0, log: [] })
 
 /** Catatan diagnostik singkat (tampil di halaman Printer Struk). */
 function log(message) {
@@ -320,8 +321,21 @@ export async function checkPrinter() {
     printerState.status = 'offline'
     printerState.lastError = e?.message || String(e)
     log(`Cek printer GAGAL: ${printerState.lastError}`)
+  } finally {
+    printerState.checkedAt = Date.now()
   }
   return printerState.status
+}
+
+/**
+ * Cek otomatis (saat halaman / pemberitahuan tampil): hanya bila belum siap dan cek terakhir sudah lebih dari 30 detik.
+ * Tanpa jeda ini, pemberitahuan yang tampil-hilang mengikuti status (mis. di dialog transaksi berhasil) memicu cek →
+ * "memeriksa" → hilang → hasil → tampil → cek lagi … tanpa henti dan halaman membeku.
+ */
+export function autoCheckPrinter() {
+  if (!isDirect() || printerState.status === 'ready' || printerState.status === 'checking') return
+  if (Date.now() - printerState.checkedAt < 30_000) return
+  checkPrinter()
 }
 
 /**

@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, taxLabel } from '../utils/format'
+import { number, rupiah, tanggalAngka, taxLabel, today } from '../utils/format'
 import { printReceipt } from '../utils/print'
 import { printerConfig } from '../utils/printer'
 import { bestPromo } from '../utils/discount'
@@ -28,6 +28,7 @@ const promos = ref([])
 const errors = ref({})
 const saving = ref(false)
 const lastSale = ref(null)
+const confirming = ref(false)
 const search = ref(null)
 
 watch(customer, async (value) => {
@@ -102,13 +103,32 @@ const subtotal = computed(() => form.items.reduce((sum, line) => sum + lineTotal
 const tax = computed(() => Math.round((subtotal.value * (meta.tax_percent || 0)) / 100))
 const total = computed(() => Math.max(0, subtotal.value + tax.value))
 const overLimit = computed(() => receivable.value?.available !== null && receivable.value?.available !== undefined && total.value > receivable.value.available)
+// Bon yang masih bersisa: belum ditagih, dan per tagihan yang belum lunas.
+const unbilledBons = computed(() => (receivable.value?.bons || []).filter((bon) => !bon.bill))
+const billGroups = computed(() => {
+  const groups = new Map()
+  for (const bon of receivable.value?.bons || []) {
+    if (!bon.bill) continue
+    if (!groups.has(bon.bill.id)) groups.set(bon.bill.id, { ...bon.bill, overdue: bon.bill.due_date < today(), bons: [] })
+    groups.get(bon.bill.id).bons.push(bon)
+  }
+  return [...groups.values()]
+})
+const unitName = (line) => line.units.find((unit) => unit.id === line.unit_id)?.name ?? line.base_unit
+
 const baseQty = (productId) => form.items.filter((line) => line.product_id === productId).reduce((sum, line) => sum + (Number(line.qty) || 0) * line.conversion, 0)
 
-async function save() {
+// Simpan Bon → dialog konfirmasi isi nota dulu, baru disimpan (lalu dialog cetak).
+function confirmSave() {
   if (!customer.value) {
     errors.value = { customer_id: 'Pilih pelanggan terlebih dahulu.' }
     return
   }
+  errors.value = {}
+  confirming.value = true
+}
+
+async function save() {
   saving.value = true
   errors.value = {}
   try {
@@ -117,12 +137,14 @@ async function save() {
       items: form.items.map((line) => ({ product_unit_id: line.unit_id, qty: Number(line.qty), omit: line.omit.length ? line.omit : undefined })),
       notes: form.notes || null,
     })
+    confirming.value = false
     lastSale.value = data.data
     if (printerConfig.autoPrint) nextTick(() => printReceipt(data.data))
     Object.assign(form, { items: [], notes: '' })
     const { data: summary } = await http.get(`/customers/${customer.value.id}/receivable`)
     receivable.value = summary.data
   } catch (e) {
+    confirming.value = false
     errors.value = validationErrors(e)
     toast.error(errorMessage(e))
   } finally {
@@ -157,8 +179,27 @@ onMounted(() => {
         <Transition name="pop">
           <div v-if="receivable" class="space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
             <p class="font-semibold text-slate-900">Piutang pelanggan</p>
-            <div class="flex justify-between"><span class="text-slate-500">Bon belum ditagih ({{ receivable.unbilled_count }})</span><span class="tabular-nums">{{ rupiah(receivable.unbilled) }}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">Tagihan belum lunas</span><span class="tabular-nums">{{ rupiah(receivable.billed_outstanding) }}</span></div>
+            <div class="max-h-80 space-y-2 overflow-y-auto">
+              <div class="flex justify-between"><span class="text-slate-500">Bon belum ditagih ({{ receivable.unbilled_count }})</span><span class="tabular-nums">{{ rupiah(receivable.unbilled) }}</span></div>
+              <ul v-if="unbilledBons.length" class="space-y-0.5 border-l-2 border-slate-200 pl-3 text-xs">
+                <li v-for="bon in unbilledBons" :key="bon.id" class="flex justify-between gap-2 tabular-nums">
+                  <span class="min-w-0 text-slate-700">{{ bon.number }} <span class="whitespace-nowrap text-slate-400">{{ tanggalAngka(bon.business_date) }}</span></span>
+                  <span class="shrink-0 whitespace-nowrap">{{ rupiah(bon.outstanding) }}</span>
+                </li>
+              </ul>
+              <div class="flex justify-between"><span class="text-slate-500">Tagihan belum lunas</span><span class="tabular-nums">{{ rupiah(receivable.billed_outstanding) }}</span></div>
+              <div v-for="group in billGroups" :key="group.id" class="border-l-2 pl-3 text-xs" :class="group.overdue ? 'border-red-300' : 'border-slate-200'">
+                <p class="mb-0.5 font-medium" :class="group.overdue ? 'text-red-600' : 'text-slate-500'">
+                  {{ group.number }} · <span class="whitespace-nowrap">jatuh tempo {{ tanggalAngka(group.due_date) }}<span v-if="group.overdue"> (lewat)</span></span>
+                </p>
+                <ul class="space-y-0.5">
+                  <li v-for="bon in group.bons" :key="bon.id" class="flex justify-between gap-2 tabular-nums">
+                    <span class="min-w-0 text-slate-700">{{ bon.number }} <span class="whitespace-nowrap text-slate-400">{{ tanggalAngka(bon.business_date) }}</span></span>
+                    <span class="shrink-0 whitespace-nowrap">{{ rupiah(bon.outstanding) }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
             <div v-if="receivable.overdue" class="flex justify-between text-red-600"><span>Lewat jatuh tempo</span><span class="tabular-nums">{{ rupiah(receivable.overdue) }}</span></div>
             <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total piutang</span><span class="tabular-nums">{{ rupiah(receivable.outstanding) }}</span></div>
             <div v-if="receivable.available !== null" class="flex justify-between" :class="overLimit ? 'font-semibold text-red-600' : 'text-emerald-700'">
@@ -238,13 +279,48 @@ onMounted(() => {
           <p v-if="overLimit" class="rounded-lg bg-red-50 px-3 py-2 text-red-700">Total bon melebihi sisa limit kredit pelanggan.</p>
           <div class="flex justify-end gap-2 pt-2">
             <RouterLink :to="{ name: 'credit-sales' }" class="btn-secondary">Batal</RouterLink>
-            <button class="btn-primary" :disabled="saving || !form.items.length || !customer" @click="save">
+            <button class="btn-primary" :disabled="saving || !form.items.length || !customer" @click="confirmSave">
               <AppIcon name="book" :size="16" /> {{ saving ? 'Menyimpan…' : 'Simpan Bon' }}
             </button>
           </div>
         </div>
       </section>
     </div>
+
+    <AppModal v-if="confirming" title="Konfirmasi Bon" size="md" @close="confirming = false">
+      <div class="space-y-4 text-sm">
+        <div class="rounded-xl bg-brand-50 px-4 py-3">
+          <p class="text-xs text-brand-800">Pelanggan</p>
+          <p class="font-semibold text-brand-900">{{ customer.name }}<span v-if="customer.phone" class="font-normal text-brand-800"> · {{ customer.phone }}</span></p>
+        </div>
+        <ul class="divide-y divide-slate-100 rounded-xl border border-slate-200">
+          <li v-for="line in form.items" :key="line.key" class="flex items-start justify-between gap-3 px-3 py-2">
+            <div class="min-w-0">
+              <p class="font-medium">{{ line.name }}</p>
+              <p class="text-xs text-slate-500">
+                {{ number(line.qty) }} {{ unitName(line) }} × {{ rupiah(line.price, false) }}
+                <span v-if="line.omit.length"> · tanpa {{ line.options.filter((option) => line.omit.includes(option.id)).map((option) => option.name).join(', ') }}</span>
+                <span v-if="linePromo(line).amount" class="text-rose-700"> · {{ linePromo(line).promo.name }}</span>
+              </p>
+            </div>
+            <span class="shrink-0 font-medium tabular-nums">{{ rupiah(lineTotal(line), false) }}</span>
+          </li>
+        </ul>
+        <div class="space-y-1.5">
+          <div class="flex justify-between"><span class="text-slate-500">Subtotal ({{ form.items.length }} barang)</span><span class="tabular-nums">{{ rupiah(grossTotal) }}</span></div>
+          <div v-if="grossTotal !== subtotal" class="flex justify-between text-rose-700"><span>Hemat promo</span><span class="tabular-nums">−{{ rupiah(grossTotal - subtotal) }}</span></div>
+          <div v-if="meta.tax_percent" class="flex justify-between"><span class="text-slate-500">{{ taxLabel(meta) }}</span><span class="tabular-nums">{{ rupiah(tax) }}</span></div>
+          <div class="flex items-baseline justify-between border-t border-slate-200 pt-2"><span class="font-semibold">Total bon</span><span class="text-xl font-bold text-brand-700 tabular-nums">{{ rupiah(total) }}</span></div>
+        </div>
+        <p v-if="form.notes" class="rounded-lg bg-slate-50 px-3 py-2 text-slate-600"><span class="text-slate-500">Catatan:</span> {{ form.notes }}</p>
+        <p v-if="overLimit" class="rounded-lg bg-red-50 px-3 py-2 text-red-700">Total bon melebihi sisa limit kredit pelanggan.</p>
+        <p class="text-slate-500">Pastikan barang & jumlahnya sudah benar. Bon dicatat sebagai piutang {{ customer.name }}.</p>
+      </div>
+      <template #footer>
+        <button class="btn-secondary" :disabled="saving" @click="confirming = false">Periksa lagi</button>
+        <button class="btn-primary" :disabled="saving" @click="save"><AppIcon name="book" :size="16" /> {{ saving ? 'Menyimpan…' : 'Ya, Simpan Bon' }}</button>
+      </template>
+    </AppModal>
 
     <AppModal v-if="lastSale" title="Bon tersimpan" size="sm" @close="newBon(true)">
       <div class="space-y-3 text-center">

@@ -20,7 +20,7 @@ kanaka/
 
 | Modul | Isi |
 | --- | --- |
-| **Kasir (POS)** | Scan barcode / cari produk, keranjang, **promo otomatis** (tanpa input diskon manual), pajak (opsional), bayar tunai (hitung kembalian) / transfer / QRIS / kartu, cetak struk thermal 58/80mm, pelanggan. Shortcut: `F2` cari, `F8` bayar, `Enter` transaksi baru. |
+| **Kasir (POS)** | Scan barcode / cari produk (produk stok 0 disembunyikan kecuali *Tampilkan stok 0* dicentang), keranjang, **promo otomatis** (tanpa input diskon manual), pajak (opsional), bayar tunai (hitung kembalian) / transfer / QRIS / kartu, cetak struk thermal 58/80mm, pelanggan. Shortcut: `F2` cari, `F8` bayar, `Enter` transaksi baru. |
 | **Penjualan kredit (bon)** | Menu terpisah dari kasir untuk "ambil dulu bayar nanti": pilih pelanggan, input barang (per satuan), cetak nota bon. Batas kredit per pelanggan (opsional). |
 | **Tagihan & piutang** | Tagihan bulanan per pelanggan dibuat **otomatis setiap tanggal 1 pukul 01:00** (atau manual kapan saja), cetak tagihan A4, cetak thermal (per bon, header & catatan kaki seperti struk) & unduh PDF, **pembayaran per baris bon** (bayar sebagian / lunas, sebelum atau sesudah ditagih) dengan bukti bayar thermal & riwayat pembayaran, saldo piutang per pelanggan, peringatan lewat jatuh tempo. |
 | **Diskon & promo** | Potongan persen atau nominal per satuan untuk produk tertentu (bisa dibatasi satuan tertentu, mis. hanya BOX), dengan periode mulai–berakhir dan minimal beli. Otomatis diterapkan di kasir & bon. |
@@ -179,7 +179,9 @@ Kasir tidak lagi mengisi diskon manual. Potongan hanya berasal dari menu **Disko
 ## Penjualan kredit & tagihan bulanan
 
 1. **Bon**: menu *Penjualan Kredit* → *Bon Baru*. Stok langsung berkurang; transaksi tercatat dengan metode `piutang`
-   (tidak menambah kas). Jika pelanggan punya batas kredit, bon ditolak bila total piutang melebihi batas.
+   (tidak menambah kas). Jika pelanggan punya batas kredit, bon ditolak bila total piutang melebihi batas. Panel
+   *Piutang pelanggan* merinci bon yang masih bersisa (nomor, tanggal DD-MM-YYYY, sisa) — yang belum ditagih dan per
+   tagihan belum lunas beserta jatuh temponya. *Simpan Bon* menampilkan dialog konfirmasi isi nota sebelum disimpan.
 2. **Tagihan**: `php artisan bills:generate` dijadwalkan setiap tanggal 1 pukul 01:00 untuk semua bon bulan sebelumnya
    yang belum ditagih (satu tagihan per pelanggan). Bisa juga manual dari menu *Tagihan & Piutang* (semua pelanggan atau
    satu pelanggan, mis. yang ingin melunasi di tengah bulan). Jatuh tempo = tanggal tagihan + N hari (Pengaturan Toko).

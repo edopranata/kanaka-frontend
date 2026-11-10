@@ -1,23 +1,19 @@
 <script setup>
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import http, { errorMessage, validationErrors } from '../api/http'
+import http, { errorMessage } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { rupiah, tanggal } from '../utils/format'
 import { downloadBillPdf } from '../utils/billPdf'
-import { billBytes, columnsFor } from '../utils/escpos'
-import { printWithBrowser, receiptPaper } from '../utils/print'
-import { isDirect, printerConfig, sendBytes } from '../utils/printer'
+import { billBytes, columnsFor, paymentBytes } from '../utils/escpos'
+import { printThermal, receiptPaper } from '../utils/print'
+import { printerConfig } from '../utils/printer'
 import { periodLabel } from '../utils/invoice'
 import AppIcon from '../components/AppIcon.vue'
-import BankSelect from '../components/BankSelect.vue'
 import BillDocument from '../components/BillDocument.vue'
-import AppModal from '../components/AppModal.vue'
-import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
-import ThermalPrint from '../components/ThermalPrint.vue'
-import AppSelect from '../components/AppSelect.vue'
+import PayLinesModal from '../components/PayLinesModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../stores/confirm'
 
@@ -28,37 +24,20 @@ const meta = useMetaStore()
 const toast = useToastStore()
 
 const bill = ref(null)
-const payForm = ref(null)
-const payErrors = ref({})
-const paying = ref(false)
 const print = () => window.print()
 const pdfBusy = ref(false)
 
 // Cetak thermal: header & catatan kaki seperti struk; printer langsung bila diatur, selain itu dialog cetak browser.
-const thermal = ref(null)
 const thermalBusy = ref(false)
-async function printThermal() {
+async function printThermalBill() {
   thermalBusy.value = true
-  const columns = columnsFor(receiptPaper())
-  const bytes = billBytes(bill.value, { store: meta.store, template: meta.invoice, columns, feed: printerConfig.feed, cut: printerConfig.cut })
   try {
-    if (isDirect()) {
-      try {
-        await sendBytes(bytes)
-        toast.success('Nota tagihan dikirim ke printer.')
-        return
-      } catch (e) {
-        toast.error(`${e.message || 'Gagal mencetak ke printer.'} Memakai dialog cetak browser.`)
-      }
-    }
-    thermal.value = { bytes, columns }
-    await nextTick()
-    printWithBrowser()
+    const columns = columnsFor(receiptPaper())
+    await printThermal(billBytes(bill.value, { store: meta.store, template: meta.invoice, columns, feed: printerConfig.feed, cut: printerConfig.cut }), columns, 'Nota tagihan dikirim ke printer.')
   } finally {
     thermalBusy.value = false
   }
 }
-
 async function downloadPdf() {
   pdfBusy.value = true
   try {
@@ -79,32 +58,25 @@ async function load() {
   }
 }
 
-function openPay() {
-  payErrors.value = {}
-  payForm.value = reactive({ amount: bill.value.remaining, payment_method: 'tunai', cash_account_id: null, notes: '' })
-}
+// Catat pembayaran: pilih baris bon tagihan ini (utuh), lihat PayLinesModal.
+const paying = ref(false)
 
-async function pay() {
-  paying.value = true
-  payErrors.value = {}
+async function printPayment(payment) {
   try {
-    const { data } = await http.post(`/bills/${bill.value.id}/payments`, payForm.value)
-    bill.value = data.data
-    payForm.value = null
-    toast.success(bill.value.status === 'lunas' ? 'Tagihan lunas.' : 'Pembayaran dicatat.')
+    const { data } = await http.get(`/receivable-payments/${payment.id}`)
+    const columns = columnsFor(receiptPaper())
+    await printThermal(paymentBytes(data.data, { store: meta.store, columns, outstanding: data.outstanding, feed: printerConfig.feed, cut: printerConfig.cut }), columns, 'Bukti bayar dikirim ke printer.')
   } catch (e) {
-    payErrors.value = validationErrors(e)
-    if (!Object.keys(payErrors.value).length) toast.error(errorMessage(e))
-  } finally {
-    paying.value = false
+    toast.error(errorMessage(e))
   }
 }
 
 async function cancelPayment(payment) {
-  if (!(await confirmDialog({ title: 'Batalkan pembayaran', message: `Batalkan pembayaran ${rupiah(payment.amount)} tanggal ${tanggal(payment.date)}?`, confirmLabel: 'Batalkan pembayaran', cancelLabel: 'Kembali', tone: 'danger' }))) return
+  const others = payment.total > payment.amount ? ` Pembayaran ini juga mencakup bon lain (total ${rupiah(payment.total)}); semuanya ikut dibatalkan.` : ''
+  if (!(await confirmDialog({ title: 'Batalkan pembayaran', message: `Batalkan pembayaran ${payment.number || ''} tanggal ${tanggal(payment.date)}? Baris bonnya kembali menjadi belum dibayar.${others}`, confirmLabel: 'Batalkan pembayaran', cancelLabel: 'Kembali', tone: 'danger' }))) return
   try {
-    const { data } = await http.delete(`/bills/${bill.value.id}/payments/${payment.id}`)
-    bill.value = data.data
+    await http.delete(`/receivable-payments/${payment.id}`)
+    await load()
     toast.success('Pembayaran dibatalkan.')
   } catch (e) {
     toast.error(errorMessage(e))
@@ -130,10 +102,10 @@ onMounted(load)
     <PageHeader :title="bill?.number || 'Detail Tagihan'" :subtitle="bill ? `${bill.customer.name} · ${periodLabel(bill.period)}` : ''" :back="{ name: 'bills' }" class="no-print">
       <template v-if="bill" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak Tagihan</button>
-        <button class="btn-secondary" :disabled="thermalBusy" @click="printThermal"><AppIcon name="receipt" :size="16" /> Cetak Thermal</button>
+        <button class="btn-secondary" :disabled="thermalBusy" @click="printThermalBill"><AppIcon name="receipt" :size="16" /> Cetak Thermal</button>
         <button class="btn-secondary" :disabled="pdfBusy" @click="downloadPdf"><AppIcon name="download" :size="16" /> {{ pdfBusy ? 'Membuat PDF…' : 'Unduh PDF' }}</button>
         <button v-if="bill.paid === 0 && auth.can('bills.delete')" class="btn-secondary text-red-600" @click="cancelBill"><AppIcon name="ban" :size="16" /> Batalkan</button>
-        <button v-if="bill.remaining > 0 && auth.can('bills.pay')" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Catat Pembayaran</button>
+        <button v-if="bill.remaining > 0 && auth.can('bills.pay')" class="btn-primary" @click="paying = true"><AppIcon name="cash" :size="16" /> Catat Pembayaran</button>
       </template>
     </PageHeader>
 
@@ -146,56 +118,30 @@ onMounted(load)
         <h2 class="border-b border-slate-100 px-5 py-3 font-semibold">Riwayat pembayaran</h2>
         <div class="table-wrap">
           <table v-stack class="table">
-            <thead><tr><th>Tanggal</th><th>Metode</th><th>Catatan</th><th>Dicatat</th><th class="num">Jumlah</th><th class="no-print"></th></tr></thead>
+            <thead><tr><th>No. Pembayaran</th><th>Tanggal</th><th>Metode</th><th>Catatan</th><th>Dicatat</th><th class="num">Jumlah</th><th class="no-print"></th></tr></thead>
             <tbody>
               <tr v-for="payment in bill.payments" :key="payment.id">
+                <td class="font-medium">{{ payment.number || '—' }}</td>
                 <td>{{ tanggal(payment.date) }}</td>
                 <td>{{ payment.payment_label }}</td>
                 <td class="whitespace-normal text-slate-500">{{ payment.notes || '' }}</td>
                 <td>{{ payment.user }}</td>
-                <td class="num font-medium">{{ rupiah(payment.amount, false) }}</td>
+                <td class="num font-medium">
+                  {{ rupiah(payment.amount, false) }}
+                  <p v-if="payment.total > payment.amount" class="text-xs font-normal text-slate-500">dari {{ rupiah(payment.total, false) }} (termasuk bon lain)</p>
+                </td>
                 <td class="no-print text-right">
+                  <button v-if="payment.number" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Cetak bukti" @click="printPayment(payment)"><AppIcon name="printer" :size="16" /></button>
                   <button v-if="auth.can('bills.cancel_payment')" class="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Batalkan pembayaran" @click="cancelPayment(payment)"><AppIcon name="trash" :size="16" /></button>
                 </td>
               </tr>
-              <tr v-if="!bill.payments.length"><td colspan="6" class="py-6 text-center text-slate-500">Belum ada pembayaran.</td></tr>
+              <tr v-if="!bill.payments.length"><td colspan="7" class="py-6 text-center text-slate-500">Belum ada pembayaran.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
     </template>
 
-    <AppModal v-if="payForm" title="Catat Pembayaran" size="sm" @close="payForm = null">
-      <form id="pay-form" class="space-y-4" @submit.prevent="pay">
-        <div class="rounded-xl bg-brand-50 p-4 text-center">
-          <p class="text-sm text-brand-800">Sisa tagihan</p>
-          <p class="text-2xl font-bold text-brand-800 tabular-nums">{{ rupiah(bill.remaining) }}</p>
-        </div>
-        <div>
-          <label class="label">Jumlah dibayar</label>
-          <MoneyInput v-model="payForm.amount" :invalid="!!payErrors.amount" />
-          <p v-if="payErrors.amount" class="error-text">{{ payErrors.amount }}</p>
-          <div class="mt-2 flex gap-2">
-            <button type="button" class="btn-secondary btn-sm" @click="payForm.amount = bill.remaining">Lunas</button>
-            <button type="button" class="btn-secondary btn-sm" @click="payForm.amount = Math.round(bill.remaining / 2)">Setengah</button>
-          </div>
-        </div>
-        <div>
-          <label class="label">Metode</label>
-          <AppSelect v-model="payForm.payment_method" class="input" :options="meta.payment_methods" />
-          <p class="mt-1 text-xs text-slate-500">{{ payForm.payment_method === 'tunai' ? 'Tunai masuk ke kas fisik Anda.' : 'Non tunai masuk ke rekening bank.' }}</p>
-        </div>
-        <BankSelect v-model="payForm.cash_account_id" :method="payForm.payment_method" label="Ke rekening" />
-        <div>
-          <label class="label">Catatan</label>
-          <input v-model="payForm.notes" class="input" placeholder="Opsional" />
-        </div>
-      </form>
-      <template #footer>
-        <button class="btn-secondary" @click="payForm = null">Batal</button>
-        <button class="btn-primary" type="submit" form="pay-form" :disabled="paying || !payForm.amount">{{ paying ? 'Menyimpan…' : 'Simpan Pembayaran' }}</button>
-      </template>
-    </AppModal>
-    <ThermalPrint v-if="thermal" :bytes="thermal.bytes" :columns="thermal.columns" />
+    <PayLinesModal v-if="paying" :customer="bill.customer" :bill-id="bill.id" @paid="load" @close="paying = false" />
   </div>
 </template>

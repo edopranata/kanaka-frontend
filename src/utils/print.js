@@ -1,3 +1,4 @@
+import { nextTick, reactive } from 'vue'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { columnsFor, receiptBytes } from './escpos'
@@ -33,12 +34,35 @@ export async function printReceipt(sale = null) {
   printWithBrowser()
 }
 
+/** Dokumen thermal (ESC/POS) yang sedang dicetak lewat dialog browser; ditampilkan ThermalPrint di App.vue. */
+export const thermalDocument = reactive({ bytes: null, columns: 32 })
+
+/**
+ * Cetak perintah ESC/POS (nota tagihan, bukti bayar, dsb.): printer langsung bila perangkat ini memakainya, selain itu
+ * (atau bila gagal) dialog cetak browser dengan tampilan thermal yang sama.
+ */
+export async function printThermal(bytes, columns, sentMessage = 'Dikirim ke printer.') {
+  if (isDirect()) {
+    try {
+      await sendBytes(bytes)
+      useToastStore().success(sentMessage)
+      return
+    } catch (e) {
+      useToastStore().error(`${e.message || 'Gagal mencetak ke printer.'} Memakai dialog cetak browser.`)
+    }
+  }
+  Object.assign(thermalDocument, { bytes, columns })
+  await nextTick()
+  printWithBrowser(() => (thermalDocument.bytes = null))
+}
+
 /** Cetak hanya elemen .receipt-print (struk), bukan seluruh halaman. */
-export function printWithBrowser() {
+export function printWithBrowser(afterPrint = null) {
   document.body.classList.add('printing-receipt')
   const cleanup = () => {
     document.body.classList.remove('printing-receipt')
     window.removeEventListener('afterprint', cleanup)
+    afterPrint?.()
   }
   window.addEventListener('afterprint', cleanup)
   setTimeout(() => window.print(), 50)

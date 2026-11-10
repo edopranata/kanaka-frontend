@@ -114,6 +114,7 @@ const documents = [
   { key: 'prefix_adjustment', type: 'adjustment', label: 'Penyesuaian stok' },
   { key: 'prefix_opname', type: 'opname', label: 'Stok opname' },
   { key: 'prefix_bill', type: 'bill', label: 'Tagihan piutang' },
+  { key: 'prefix_bill_payment', type: 'bill_payment', label: 'Pembayaran piutang' },
   { key: 'prefix_consignment', type: 'consignment', label: 'Titipan masuk' },
   { key: 'prefix_consignment_settlement', type: 'consignment_settlement', label: 'Penyelesaian titipan' },
   { key: 'prefix_cash_transfer', type: 'cash_transfer', label: 'Perpindahan kas (setor / serah terima)' },

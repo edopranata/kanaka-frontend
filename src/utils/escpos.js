@@ -1,5 +1,5 @@
 import { encode } from 'uqr'
-import { itemName, number, taxLabel, waktu } from './format'
+import { itemName, number, tanggalAngka, taxLabel, waktu } from './format'
 
 /**
  * Penyusun perintah ESC/POS untuk printer thermal (Rongta, Epson, Xprinter, dll.).
@@ -335,7 +335,7 @@ function detailedReceipt(doc, sale, store) {
 }
 
 /** "2026-11-03" → "03-11-2026". */
-const dmy = (value) => String(value || '').slice(0, 10).split('-').reverse().join('-')
+const dmy = (value) => tanggalAngka(value, '-', '')
 const rp = (value) => `${value < 0 ? '-' : ''}Rp ${number(Math.abs(value))}`
 
 /**

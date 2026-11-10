@@ -1,4 +1,4 @@
-import { number } from './format'
+import { number, tanggalAngka } from './format'
 
 /**
  * Export PDF laporan dengan tata letak sama seperti export Excel (ReportExporter.php): nama toko, judul &
@@ -26,10 +26,8 @@ export function formatCell(value, type) {
       return number(Math.round(Number(value)))
     case 'percent':
       return `${percentFormatter.format(Number(value) || 0)}%`
-    case 'date': {
-      const [year, month, day] = String(value).slice(0, 10).split('-')
-      return `${day}/${month}/${year}`
-    }
+    case 'date':
+      return tanggalAngka(value, '/')
     default:
       return String(value)
   }

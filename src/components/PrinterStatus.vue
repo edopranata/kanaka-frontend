@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted } from 'vue'
-import { checkPrinter, isDirect, printerConfig, printerNotice, printerState } from '../utils/printer'
+import { autoCheckPrinter, checkPrinter, isDirect, printerConfig, printerNotice, printerState } from '../utils/printer'
 import AppIcon from './AppIcon.vue'
 
 /**
@@ -13,9 +13,7 @@ const styles = {
   error: 'bg-red-50 text-red-800',
 }
 
-onMounted(() => {
-  if (isDirect() && printerState.status !== 'ready') checkPrinter()
-})
+onMounted(autoCheckPrinter)
 </script>
 
 <template>

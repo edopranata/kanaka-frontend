@@ -32,6 +32,8 @@ const categoryId = ref('')
 const categories = ref([])
 const products = ref([])
 const loadingProducts = ref(false)
+// Default: produk yang stoknya habis (termasuk paket yang bahan wajibnya habis) disembunyikan.
+const showEmpty = ref(false)
 const searchInput = ref(null)
 let searchTimer = null
 
@@ -39,7 +41,7 @@ async function loadProducts() {
   loadingProducts.value = true
   try {
     const { data } = await http.get('/products', {
-      params: { search: search.value || undefined, category_id: categoryId.value || undefined, active: 1, sellable: 1, per_page: 48 },
+      params: { search: search.value || undefined, category_id: categoryId.value || undefined, active: 1, sellable: 1, in_stock: showEmpty.value ? undefined : 1, per_page: 48 },
     })
     products.value = data.data
   } catch (e) {
@@ -390,10 +392,17 @@ onBeforeUnmount(() => {
             <span class="hidden sm:inline">Kategori lainnya</span><span class="sm:hidden">Lainnya</span>
             <span v-if="hiddenCategoryCount" class="rounded-full bg-slate-200 px-1.5 text-[11px] tabular-nums">{{ hiddenCategoryCount }}</span>
           </button>
+          <label class="flex shrink-0 cursor-pointer items-center gap-1.5 self-center px-1 text-sm whitespace-nowrap text-slate-600" title="Tampilkan produk yang stoknya 0">
+            <input v-model="showEmpty" type="checkbox" @change="loadProducts" />
+            <span class="hidden sm:inline">Tampilkan stok 0</span><span class="sm:hidden">Stok 0</span>
+          </label>
         </div>
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto p-3">
-        <div v-if="!products.length && !loadingProducts" class="py-10 text-center text-sm text-slate-500">Produk tidak ditemukan.</div>
+        <div v-if="!products.length && !loadingProducts" class="py-10 text-center text-sm text-slate-500">
+          Produk tidak ditemukan.
+          <p v-if="!showEmpty" class="mt-1 text-xs">Produk yang stoknya 0 disembunyikan — centang <b>Tampilkan stok 0</b> untuk melihatnya.</p>
+        </div>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
           <button
             v-for="product in products"

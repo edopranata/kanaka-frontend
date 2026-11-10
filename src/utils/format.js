@@ -39,6 +39,9 @@ export function tanggal(value, month = 'short') {
   })
 }
 
+/** Tanggal angka DD-MM-YYYY (mis. daftar bon). */
+export const tanggalAngka = (value) => (value ? value.slice(0, 10).split('-').reverse().join('-') : '-')
+
 export function hariTanggal(value) {
   if (!value) return '-'
   return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', {

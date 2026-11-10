@@ -194,14 +194,57 @@ function footer(doc, store, qrUrl, qrSize) {
   }
 }
 
+/** Bentuk cetakan struk thermal (Pengaturan → Toko & Struk → Struk). Isi, identitas toko, catatan kaki & QR sama. */
+export const RECEIPT_TEMPLATES = [
+  { value: 'standar', label: 'Standar', hint: 'Harga satuan di bawah tiap barang, TOTAL besar.' },
+  { value: 'ringkas', label: 'Ringkas', hint: 'Satu baris per barang & header kecil, hemat kertas.' },
+  { value: 'detail', label: 'Detail', hint: 'Kolom Qty / Harga / Total, jumlah item, dan total hemat promo.' },
+]
+
 /**
- * Struk penjualan / bon — isi sama dengan tampilan cetak HTML (ReceiptPrint.vue).
+ * Struk penjualan / bon dalam bentuk sesuai pengaturan (store.receipt_template). Bentuk standar sama dengan
+ * tampilan cetak HTML (ReceiptPrint.vue).
  *
  * @param {object} sale  data penjualan dari API (SaleResource)
  * @param {{ store: object, columns: number, feed?: number, cut?: boolean, qrUrl?: string|null }} options
  */
 export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl = null, qrSize = 'sedang' }) {
   const doc = new EscPos(columns)
+  const layout = { ringkas: compactReceipt, detail: detailedReceipt }[store.receipt_template] ?? standardReceipt
+  layout(doc, sale, store)
+  footer(doc, store, qrUrl, qrSize)
+  doc.feed(feed)
+  if (cut) doc.cut()
+  return doc.build()
+}
+
+/** Nama barang + varian paket, mis. "H2 Nasi Putih" / "Indomie Telur (tanpa Telur)". */
+const lineName = (item) => `${itemName(item)}${item.variant ? ` (${item.variant})` : ''}`
+
+/** Subtotal, diskon & pajak (bila ada), lalu TOTAL. */
+function totals(doc, sale, { always = true, big = true } = {}) {
+  if (always || sale.discount || sale.tax) doc.pair('Subtotal', number(sale.subtotal))
+  if (sale.discount) doc.pair('Diskon', `-${number(sale.discount)}`)
+  if (sale.tax) doc.pair(taxLabel(sale), number(sale.tax))
+  doc.bold(true)
+  if (big) doc.size(1, 2)
+  doc.pair('TOTAL', number(sale.total)).size(1, 1).bold(false)
+}
+
+/** Pembayaran (atau keterangan bon, bisa disembunyikan di Pengaturan) dan tanda batal. */
+function payment(doc, sale, store) {
+  if (sale.payment_method === 'piutang') {
+    if (store.credit_note !== false) doc.line().center('*** BON - BAYAR NANTI ***').center('Ditagih pada tagihan bulanan')
+    doc.line().pair('Penerima', `( ${sale.customer?.name ?? '-'} )`)
+  } else {
+    doc.pair(sale.payment_label || 'Bayar', number(sale.paid))
+    if (sale.change) doc.pair('Kembali', number(sale.change))
+  }
+  if (sale.status === 'batal') doc.line().bold(true).center('*** DIBATALKAN ***').bold(false)
+}
+
+/** Standar: nama barang, lalu "qty satuan x harga" & jumlah; TOTAL besar. */
+function standardReceipt(doc, sale, store) {
   header(doc, store).separator()
   doc.line(`No   : ${sale.number}`)
   doc.line(`Tgl  : ${waktu(sale.created_at)}`)
@@ -217,22 +260,119 @@ export function receiptBytes(sale, { store, columns, feed = 3, cut = true, qrUrl
   }
 
   doc.separator()
-  doc.pair('Subtotal', number(sale.subtotal))
-  if (sale.discount) doc.pair('Diskon', `-${number(sale.discount)}`)
-  if (sale.tax) doc.pair(taxLabel(sale), number(sale.tax))
-  doc.bold(true).size(1, 2).pair('TOTAL', number(sale.total)).size(1, 1).bold(false)
+  totals(doc, sale)
+  payment(doc, sale, store)
+  doc.separator()
+}
 
-  if (sale.payment_method === 'piutang') {
-    doc.line().center('*** BON - BAYAR NANTI ***').center('Ditagih pada tagihan bulanan').line()
-    doc.pair('Penerima', `( ${sale.customer?.name ?? '-'} )`)
-  } else {
-    doc.pair(sale.payment_label || 'Bayar', number(sale.paid))
-    if (sale.change) doc.pair('Kembali', number(sale.change))
+/** "10/11/26 14.10" — tanggal & jam singkat untuk struk ringkas. */
+const shortTime = (value) => {
+  const date = new Date(value)
+  const pad = (number) => String(number).padStart(2, '0')
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${String(date.getFullYear()).slice(2)} ${pad(date.getHours())}.${pad(date.getMinutes())}`
+}
+
+/** Ringkas (hemat kertas): header tanpa huruf besar, info 2 baris, satu baris per barang, total tanpa huruf tinggi. */
+function compactReceipt(doc, sale, store) {
+  doc.align('center').bold(true)
+  doc.wrap(store.name).forEach((line) => doc.line(line))
+  doc.bold(false)
+  headerLines(store).forEach((text) => doc.wrap(text).forEach((line) => doc.line(line)))
+  doc.align('left')
+  for (let i = 0; i < headerGap(store); i++) doc.line()
+  doc.separator()
+  doc.pair(sale.number, shortTime(sale.created_at))
+  if (sale.customer) doc.pair(`Kasir: ${sale.cashier ?? '-'}`, `Plg: ${sale.customer.name}`)
+  else doc.line(`Kasir: ${sale.cashier ?? '-'}`)
+  doc.separator()
+
+  for (const item of sale.items || []) {
+    doc.pair(`${item.qty} ${item.unit} ${lineName(item)}`, number(item.qty * item.price))
+    if (item.discount) doc.pair(`  ${promoLabel(item)}`, `-${number(item.discount)}`)
   }
-  if (sale.status === 'batal') doc.line().bold(true).center('*** DIBATALKAN ***').bold(false)
 
   doc.separator()
-  footer(doc, store, qrUrl, qrSize)
+  totals(doc, sale, { always: false, big: false })
+  payment(doc, sale, store)
+  doc.separator()
+}
+
+/** Detail: info dua kolom, tabel Qty / Harga / Total, jumlah item, dan total hemat promo. */
+function detailedReceipt(doc, sale, store) {
+  header(doc, store).separator('=')
+  doc.pair('No. Nota', sale.number)
+  doc.pair('Tanggal', waktu(sale.created_at))
+  doc.pair('Kasir', sale.cashier ?? '-')
+  if (sale.customer) doc.pair('Pelanggan', sale.customer.name)
+  doc.separator('=')
+
+  // Kolom: qty (sisa lebar) · harga · total, rata kanan.
+  const wide = doc.columns >= 48
+  const priceWidth = wide ? 12 : 9
+  const totalWidth = wide ? 13 : 10
+  const row = (qty, price, total) => {
+    const left = toAscii(qty).slice(0, doc.columns - priceWidth - totalWidth)
+    return left + toAscii(price).padStart(doc.columns - totalWidth - left.length) + toAscii(total).padStart(totalWidth)
+  }
+  doc.bold(true).line(row('Barang / Qty', 'Harga', 'Total')).bold(false)
+  doc.separator()
+  let items = 0
+  let saved = Number(sale.discount) || 0
+  for (const item of sale.items || []) {
+    items += Number(item.qty) || 0
+    saved += Number(item.discount) || 0
+    doc.wrap(lineName(item)).forEach((line) => doc.line(line))
+    doc.line(row(`  ${item.qty} ${item.unit}`, number(item.price), number(item.qty * item.price)))
+    if (item.discount) doc.pair(`  ${promoLabel(item)}`, `-${number(item.discount)}`)
+  }
+
+  doc.separator()
+  doc.pair('Jumlah', `${number(items)} item (${(sale.items || []).length} barang)`)
+  totals(doc, sale)
+  payment(doc, sale, store)
+  if (saved > 0) doc.line().bold(true).center(`Anda hemat Rp ${number(saved)}`).bold(false)
+  doc.separator('=')
+}
+
+/** "2026-11-03" → "03-11-2026". */
+const dmy = (value) => String(value || '').slice(0, 10).split('-').reverse().join('-')
+const rp = (value) => `${value < 0 ? '-' : ''}Rp ${number(Math.abs(value))}`
+
+/**
+ * Nota tagihan untuk printer thermal: header & catatan kaki mengikuti pengaturan struk; isi per bon (nomor & tanggal)
+ * dengan barangnya, lalu total, sudah dibayar, dan sisa tagihan.
+ *
+ * @param {object} bill  data tagihan dari API (/bills/{id}), termasuk sales.items
+ * @param {{ store: object, template?: object, columns: number, feed?: number, cut?: boolean }} options  template = meta.invoice (judul)
+ */
+export function billBytes(bill, { store, template = {}, columns, feed = 3, cut = true }) {
+  const doc = new EscPos(columns)
+  header(doc, store).separator()
+  doc.bold(true).pair(template.title || 'TAGIHAN', bill.number).bold(false)
+  doc.pair('Kepada', bill.customer?.name ?? '-')
+  doc.pair('Periode', new Date(`${bill.period}-01T00:00:00`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }))
+  doc.pair('Jatuh tempo', dmy(bill.due_date))
+  doc.separator()
+
+  for (const [index, sale] of (bill.sales || []).entries()) {
+    if (index) doc.line()
+    doc.bold(true).wrap(`${sale.number} (${dmy(sale.business_date)})`).forEach((line) => doc.line(line))
+    doc.bold(false)
+    for (const item of sale.items || []) {
+      doc.pair(`${item.qty} ${item.unit} ${lineName(item)}`, rp(item.qty * item.price))
+      if (item.discount) doc.pair(`  ${promoLabel(item)}`, rp(-item.discount))
+    }
+    if (sale.discount) doc.pair('  Diskon', rp(-sale.discount))
+    if (sale.tax) doc.pair(`  ${taxLabel(sale)}`, rp(sale.tax))
+  }
+
+  doc.separator()
+  doc.pair('Total tagihan', rp(bill.total))
+  doc.pair('Sudah dibayar', rp(bill.paid))
+  doc.bold(true).size(1, 2).pair('SISA TAGIHAN', rp(bill.remaining)).size(1, 1).bold(false)
+  if (bill.status === 'lunas') doc.line().bold(true).center('*** LUNAS ***').bold(false)
+  doc.separator()
+  footerLines(store.receipt_footer).forEach((line) => doc.center(line))
   doc.feed(feed)
   if (cut) doc.cut()
   return doc.build()

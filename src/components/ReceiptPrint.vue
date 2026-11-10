@@ -52,8 +52,10 @@ const qrSvg = computed(() => {
         <p v-if="sale.tax" class="row"><span>{{ taxLabel(sale) }}</span><span>{{ number(sale.tax) }}</span></p>
         <p class="row bold big"><span>TOTAL</span><span>{{ number(sale.total) }}</span></p>
         <template v-if="sale.payment_method === 'piutang'">
-          <p class="center bold">*** BON - BAYAR NANTI ***</p>
-          <p class="center">Ditagih pada tagihan bulanan</p>
+          <template v-if="meta.store.credit_note !== false">
+            <p class="center bold">*** BON - BAYAR NANTI ***</p>
+            <p class="center">Ditagih pada tagihan bulanan</p>
+          </template>
           <br />
           <p class="row"><span>Penerima</span><span>( {{ sale.customer?.name }} )</span></p>
           <br />

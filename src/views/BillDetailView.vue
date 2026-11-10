@@ -1,11 +1,14 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { rupiah, tanggal } from '../utils/format'
 import { downloadBillPdf } from '../utils/billPdf'
+import { billBytes, columnsFor } from '../utils/escpos'
+import { printWithBrowser, receiptPaper } from '../utils/print'
+import { isDirect, printerConfig, sendBytes } from '../utils/printer'
 import { periodLabel } from '../utils/invoice'
 import AppIcon from '../components/AppIcon.vue'
 import BankSelect from '../components/BankSelect.vue'
@@ -13,6 +16,7 @@ import BillDocument from '../components/BillDocument.vue'
 import AppModal from '../components/AppModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
+import ThermalPrint from '../components/ThermalPrint.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../stores/confirm'
@@ -29,6 +33,31 @@ const payErrors = ref({})
 const paying = ref(false)
 const print = () => window.print()
 const pdfBusy = ref(false)
+
+// Cetak thermal: header & catatan kaki seperti struk; printer langsung bila diatur, selain itu dialog cetak browser.
+const thermal = ref(null)
+const thermalBusy = ref(false)
+async function printThermal() {
+  thermalBusy.value = true
+  const columns = columnsFor(receiptPaper())
+  const bytes = billBytes(bill.value, { store: meta.store, template: meta.invoice, columns, feed: printerConfig.feed, cut: printerConfig.cut })
+  try {
+    if (isDirect()) {
+      try {
+        await sendBytes(bytes)
+        toast.success('Nota tagihan dikirim ke printer.')
+        return
+      } catch (e) {
+        toast.error(`${e.message || 'Gagal mencetak ke printer.'} Memakai dialog cetak browser.`)
+      }
+    }
+    thermal.value = { bytes, columns }
+    await nextTick()
+    printWithBrowser()
+  } finally {
+    thermalBusy.value = false
+  }
+}
 
 async function downloadPdf() {
   pdfBusy.value = true
@@ -101,6 +130,7 @@ onMounted(load)
     <PageHeader :title="bill?.number || 'Detail Tagihan'" :subtitle="bill ? `${bill.customer.name} · ${periodLabel(bill.period)}` : ''" :back="{ name: 'bills' }" class="no-print">
       <template v-if="bill" #actions>
         <button class="btn-secondary" @click="print"><AppIcon name="printer" :size="16" /> Cetak Tagihan</button>
+        <button class="btn-secondary" :disabled="thermalBusy" @click="printThermal"><AppIcon name="receipt" :size="16" /> Cetak Thermal</button>
         <button class="btn-secondary" :disabled="pdfBusy" @click="downloadPdf"><AppIcon name="download" :size="16" /> {{ pdfBusy ? 'Membuat PDF…' : 'Unduh PDF' }}</button>
         <button v-if="bill.paid === 0 && auth.can('bills.delete')" class="btn-secondary text-red-600" @click="cancelBill"><AppIcon name="ban" :size="16" /> Batalkan</button>
         <button v-if="bill.remaining > 0 && auth.can('bills.pay')" class="btn-primary" @click="openPay"><AppIcon name="cash" :size="16" /> Catat Pembayaran</button>
@@ -166,5 +196,6 @@ onMounted(load)
         <button class="btn-primary" type="submit" form="pay-form" :disabled="paying || !payForm.amount">{{ paying ? 'Menyimpan…' : 'Simpan Pembayaran' }}</button>
       </template>
     </AppModal>
+    <ThermalPrint v-if="thermal" :bytes="thermal.bytes" :columns="thermal.columns" />
   </div>
 </template>

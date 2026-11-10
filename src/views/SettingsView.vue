@@ -12,7 +12,7 @@ import AppSelect from '../components/AppSelect.vue'
 import NumberInput from '../components/NumberInput.vue'
 import ReceiptPreview from '../components/ReceiptPreview.vue'
 import InvoicePreview from '../components/InvoicePreview.vue'
-import { columnsFor, headerLines, receiptBytes, sampleSale } from '../utils/escpos'
+import { RECEIPT_TEMPLATES, columnsFor, headerLines, receiptBytes, sampleSale } from '../utils/escpos'
 import { taxLabel } from '../utils/format'
 import { printerConfig } from '../utils/printer'
 
@@ -59,7 +59,7 @@ const previewStore = computed(() => {
   const f = form.value
   if (!f) return {}
   const contact = f.receipt_contact === 'email' ? (f.store_email ? `Email: ${f.store_email}` : '') : f.store_phone ? `Telp. ${f.store_phone}` : ''
-  return { name: f.store_name, address: f.store_address, address2: f.store_address2, contact, header_gap: f.receipt_header_gap, receipt_footer: footer.value.join('\n') }
+  return { name: f.store_name, address: f.store_address, address2: f.store_address2, contact, header_gap: f.receipt_header_gap, receipt_footer: footer.value.join('\n'), receipt_template: f.receipt_template, credit_note: Boolean(f.receipt_credit_note) }
 })
 const previewBytes = computed(() => {
   const f = form.value
@@ -318,7 +318,8 @@ onMounted(async () => {
             </div>
 
             <div v-show="storeTab === 'receipt'" class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_auto]">
-            <div class="card space-y-5 p-5">
+            <!-- @container: kolom di dalam kartu mengikuti lebar kartu (sempit bila pratinjau di sampingnya). -->
+            <div class="@container card space-y-5 p-5">
               <h2 class="font-semibold">Identitas toko & struk</h2>
               <div class="space-y-3">
                 <p class="label mb-0">Header struk</p>
@@ -342,7 +343,7 @@ onMounted(async () => {
                     <button type="button" class="tab" :class="{ 'tab-active': form.receipt_contact === 'phone' }" @click="form.receipt_contact = 'phone'">Telp</button>
                     <button type="button" class="tab" :class="{ 'tab-active': form.receipt_contact === 'email' }" @click="form.receipt_contact = 'email'">Email</button>
                   </div>
-                  <div class="grid gap-2 sm:grid-cols-2">
+                  <div class="grid gap-2 @md:grid-cols-2">
                     <div>
                       <input v-model="form.store_phone" class="input" :class="{ 'input-error': errors.store_phone, 'ring-1 ring-brand-300': form.receipt_contact === 'phone' }" maxlength="30" placeholder="Telepon, mis. 0812-3456-7890" />
                       <p v-if="errors.store_phone" class="error-text">{{ errors.store_phone }}</p>
@@ -379,7 +380,23 @@ onMounted(async () => {
                 <p v-if="errors.receipt_footer" class="error-text">{{ errors.receipt_footer }}</p>
               </div>
 
-              <div class="grid gap-5 border-t border-slate-100 pt-5 md:grid-cols-2">
+              <div class="border-t border-slate-100 pt-5">
+                <p class="label">Tampilan cetak struk</p>
+                <div class="segmented max-w-md">
+                  <button v-for="item in RECEIPT_TEMPLATES" :key="item.value" type="button" class="tab" :class="{ 'tab-active': form.receipt_template === item.value }" @click="form.receipt_template = item.value">{{ item.label }}</button>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">{{ RECEIPT_TEMPLATES.find((item) => item.value === form.receipt_template)?.hint }} Identitas toko, catatan kaki &amp; QR tetap sama; lihat hasilnya di pratinjau.</p>
+                <p v-if="errors.receipt_template" class="error-text">{{ errors.receipt_template }}</p>
+                <label class="mt-4 flex items-start gap-3">
+                  <input v-model="form.receipt_credit_note" type="checkbox" class="mt-0.5" @change="previewKind = 'bon'" />
+                  <span>
+                    <span class="block text-sm font-medium">Tampilkan keterangan bon</span>
+                    <span class="block text-xs text-slate-500">"*** BON - BAYAR NANTI *** / Ditagih pada tagihan bulanan" pada struk bon (pembeli & penerima tetap dicetak).</span>
+                  </span>
+                </label>
+              </div>
+
+              <div class="grid gap-5 border-t border-slate-100 pt-5 @md:grid-cols-2">
                 <label class="flex items-start gap-3">
                   <input v-model="form.receipt_qr" type="checkbox" class="mt-0.5" />
                   <span>

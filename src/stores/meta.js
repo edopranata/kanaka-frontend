@@ -9,7 +9,7 @@ export const useMetaStore = defineStore('meta', {
     loaded: false,
     app: { name: 'Aplikasi Penjualan', tagline: '', receipt_paper: '80' },
     defaults: { unit: 'PCS', min_stock: 5, package_unit: 'PORSI' },
-    store: { name: 'Aplikasi Penjualan', address: '', phone: '', receipt_footer: '' },
+    store: { name: 'Aplikasi Penjualan', address: '', phone: '', receipt_footer: '', receipt_template: 'standar', credit_note: true },
     invoice: { title: 'TAGIHAN', header_name: '', header_lines: '', footer: '', signer: '', signer_title: '' },
     tax_percent: 0,
     tax_name: 'PPN',

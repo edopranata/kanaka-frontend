@@ -79,8 +79,10 @@ onMounted(async () => {
         <div v-if="sale.tax" class="flex justify-between"><dt>{{ taxLabel(sale) }}</dt><dd>{{ number(sale.tax) }}</dd></div>
         <div class="flex justify-between pt-1 font-sans text-base font-bold text-slate-900"><dt>TOTAL</dt><dd>{{ rupiah(sale.total) }}</dd></div>
         <template v-if="sale.payment_method === 'piutang'">
-          <p class="pt-2 text-center font-bold">BON — BAYAR NANTI</p>
-          <p class="text-center text-xs text-slate-500">Ditagih pada tagihan bulanan</p>
+          <template v-if="store.credit_note !== false">
+            <p class="pt-2 text-center font-bold">BON — BAYAR NANTI</p>
+            <p class="text-center text-xs text-slate-500">Ditagih pada tagihan bulanan</p>
+          </template>
         </template>
         <template v-else>
           <div class="flex justify-between"><dt>{{ sale.payment_label }}</dt><dd>{{ number(sale.paid) }}</dd></div>

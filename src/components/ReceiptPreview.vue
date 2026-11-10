@@ -9,6 +9,8 @@ import { parseEscPos, rasterToDataUrl } from '../utils/escposPreview'
 const props = defineProps({
   bytes: { type: Uint8Array, required: true },
   columns: { type: Number, default: 32 },
+  /** Untuk dialog cetak browser: ukuran fisik kertas (1 karakter ≈ 1,5 mm), tanpa bayangan, tepi sobek & garis potong. */
+  print: { type: Boolean, default: false },
 })
 
 // Printer 58 mm = 384 titik / 32 karakter, 80 mm = 576 titik / 48 karakter → 12 titik per karakter.
@@ -23,13 +25,19 @@ const justify = (align) => ({ center: 'justify-center', right: 'justify-end' })[
 <template>
   <!-- Huruf mengecil bila wadah lebih sempit dari kertas (mis. 80 mm di ponsel); 1ch ≈ 0,6em pada huruf mono.
        Bayangan lewat drop-shadow di pembungkus: mask di kertas ikut memotong box-shadow. -->
-  <div class="@container">
-    <div class="mx-auto w-fit drop-shadow-[0_1px_4px_rgb(15_23_42/0.18)]">
-      <div class="receipt-paper bg-white px-[1.5ch] pt-4 pb-5 font-mono leading-[1.4] text-slate-900" :style="{ width: `${columns + 3}ch`, fontSize: `min(12px, calc(100cqw / ${((columns + 3) * 0.62).toFixed(2)}))` }">
+  <div :class="{ '@container': !print }">
+    <div :class="print ? '' : 'mx-auto w-fit drop-shadow-[0_1px_4px_rgb(15_23_42/0.18)]'">
+      <div
+        class="bg-white font-mono leading-[1.4] text-black"
+        :class="print ? '' : 'receipt-paper px-[1.5ch] pt-4 pb-5'"
+        :style="print ? { width: `${columns}ch`, fontSize: '2.5mm' } : { width: `${columns + 3}ch`, fontSize: `min(12px, calc(100cqw / ${((columns + 3) * 0.62).toFixed(2)}))` }"
+      >
         <template v-for="(line, index) in lines" :key="index">
-          <div v-if="line.type === 'cut'" class="relative -mx-[1.5ch] my-2 border-t border-dashed border-slate-300">
-            <span class="absolute -top-2 left-1 bg-white px-1 text-[10px] leading-none text-slate-400">✂ potong</span>
-          </div>
+          <template v-if="line.type === 'cut'">
+            <div v-if="!print" class="relative -mx-[1.5ch] my-2 border-t border-dashed border-slate-300">
+              <span class="absolute -top-2 left-1 bg-white px-1 text-[10px] leading-none text-slate-400">✂ potong</span>
+            </div>
+          </template>
           <div v-else-if="line.type === 'image'" class="flex" :class="justify(line.align)">
             <img :src="line.src" alt="QR struk digital" class="[image-rendering:pixelated]" :style="{ width: `${line.widthCh}ch`, height: `${line.heightCh}ch` }" />
           </div>

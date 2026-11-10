@@ -263,6 +263,13 @@ Untuk developer: katalog hak akses (kode, grup, modul, aksi, label, ketergantung
 middleware `permission:a,b` (cukup salah satu), frontend memakai `auth.can('a')`. Menambah fitur = tambah konstanta +
 entri katalog, lalu cek di route / frontend; Pemilik otomatis mendapatkannya.
 
+Untuk developer — kolom tanggal (`DATE`, mis. `sales.business_date`, `customer_bills.due_date`, `*.date`,
+`discounts.starts_on/ends_on`) memakai cast `App\Casts\AsDate`: dibaca sebagai `App\Support\Date` (turunan
+`CarbonImmutable`, jadi bisa `->isPast()`, `->addDays()`, `->format('d-m-Y')`), disimpan & dikirim di API tetap
+`YYYY-MM-DD`. Di dalam query pakai `->toDateString()` (binding objek tanggal menjadi `Y-m-d H:i:s`); bandingkan
+tanggal dengan method Carbon, bukan `===`. Kolom baru bertipe `date` cukup ditambah `'kolom' => AsDate::class`.
+Frontend menerima `YYYY-MM-DD`; tampilan memakai `tanggal()` / `tanggalAngka()` di `frontend/src/utils/format.js`.
+
 ## Akun pengguna, email & keamanan login
 
 - **Pengguna baru** (menu Pengguna): isi *Nama lengkap, Nama pengguna, Email, Role*. Aplikasi membuat **kata sandi

@@ -39,8 +39,14 @@ export function tanggal(value, month = 'short') {
   })
 }
 
-/** Tanggal angka DD-MM-YYYY (mis. daftar bon). */
-export const tanggalAngka = (value) => (value ? value.slice(0, 10).split('-').reverse().join('-') : '-')
+/**
+ * Tanggal angka dari "YYYY-MM-DD" (format tanggal API) → "DD-MM-YYYY"; pemisah bisa diganti (mis. "/").
+ * Dipakai daftar bon, struk/nota thermal, dan PDF laporan.
+ */
+export function tanggalAngka(value, separator = '-', empty = '-') {
+  if (!value) return empty
+  return String(value).slice(0, 10).split('-').reverse().join(separator)
+}
 
 export function hariTanggal(value) {
   if (!value) return '-'

@@ -170,6 +170,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('online', setOnline)
   window.removeEventListener('offline', setOffline)
 })
+
+// Tombol "?" di header: buka bagian panduan yang sesuai halaman saat ini.
+const GUIDE_SECTIONS = {
+  pos: 'kasir', sales: 'masalah', sale: 'masalah', 'credit-sales': 'bon', 'credit-sale-create': 'bon', bills: 'bon', bill: 'bon',
+  consignments: 'bayar-titipan', 'consignment-receive': 'titipan-masuk', 'consignment-receipt': 'titipan-masuk', 'consignment-settle': 'penyelesaian', 'consignment-settlement': 'bayar-titipan',
+  purchases: 'pembelian', purchase: 'pembelian', 'purchase-create': 'pembelian', cash: 'kas', expenses: 'kas', closings: 'closing', closing: 'closing', printer: 'masalah',
+}
+const guideAnchor = computed(() => (GUIDE_SECTIONS[route.name] ? `#${GUIDE_SECTIONS[route.name]}` : ''))
 </script>
 
 <template>
@@ -401,6 +409,9 @@ onBeforeUnmount(() => {
       <div class="flex shrink-0 items-center gap-2">
         <RouterLink v-if="pendingCash && route.name !== 'cash'" :to="{ name: 'cash' }" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-600/20 transition hover:bg-amber-200">
           <AppIcon name="handover" :size="14" /> <span class="hidden sm:inline">Terima kas</span> ({{ pendingCash }})
+        </RouterLink>
+        <RouterLink v-if="route.name !== 'guide'" :to="{ name: 'guide', hash: guideAnchor }" class="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-700" title="Panduan (cara pakai halaman ini)" aria-label="Panduan">
+          <AppIcon name="info" :size="20" />
         </RouterLink>
         <RouterLink v-if="auth.can('pos') && route.name !== 'pos'" :to="{ name: 'pos' }" class="btn-primary btn-sm">
           <AppIcon name="cart" :size="16" /> Buka Kasir

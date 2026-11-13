@@ -84,6 +84,7 @@ const routes = [
       { path: 'stok/:id', name: 'adjustment', component: view('AdjustmentDetailView'), meta: { title: 'Detail Penyesuaian', permission: ['stock.adjust', 'stock.opname', 'stock.view_all'] } },
 
       { path: 'kas', name: 'cash', component: view('CashView'), meta: { title: 'Kas & Bank' } },
+      { path: 'panduan', name: 'guide', component: view('GuideView'), meta: { title: 'Panduan' } },
       { path: 'pengeluaran', name: 'expenses', component: view('ExpensesView'), meta: { title: 'Pengeluaran', permission: 'expenses.view' } },
       { path: 'closing', name: 'closings', component: view('ClosingsView'), meta: { title: 'Closing Harian', permission: 'closings.view' } },
       { path: 'closing/:id', name: 'closing', component: view('ClosingDetailView'), meta: { title: 'Detail Closing', permission: 'closings.view' } },
@@ -104,7 +105,8 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 }),
+  // #bagian (mis. Panduan) → gulir ke bagian itu (sisakan ruang untuk header); selain itu ke atas.
+  scrollBehavior: (to) => (to.hash ? { el: to.hash, top: 72 } : { top: 0 }),
 })
 
 router.beforeEach(async (to) => {

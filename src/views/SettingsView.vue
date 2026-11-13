@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import http, { errorMessage, validationErrors } from '../api/http'
+import { useRoute, useRouter } from 'vue-router'
+import { confirmDialog } from '../stores/confirm'
+import http, { download, errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
@@ -185,7 +186,72 @@ async function cleanup() {
     cleaning.value = false
   }
 }
-watch(tab, (value) => value === 'maintenance' && allowed('maintenance') && loadMaintenance(), { immediate: true })
+
+// Backup database harian (server + Google Drive).
+const backup = ref(null)
+const backingUp = ref(false)
+const driveBusy = ref(false)
+const backupRetention = [7, 14, 30]
+const dateTime = (value) => (value ? new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-')
+const driveLabels = { tersimpan: 'tersalin ke Google Drive', gagal: 'gagal disalin ke Google Drive', 'belum terhubung': 'Google Drive belum dihubungkan', dilewati: '-' }
+// Backup berhasil terakhir lebih dari 2 hari lalu → peringatan (scheduler / cron mungkin mati).
+const backupStale = computed(() => !backup.value?.last_success || Date.now() - new Date(backup.value.last_success).getTime() > 2 * 86400000)
+
+async function loadBackup() {
+  try {
+    backup.value = (await http.get('/backups')).data.data
+  } catch {
+    // tidak kritis
+  }
+}
+async function runBackup() {
+  backingUp.value = true
+  try {
+    const { data } = await http.post('/backups/run')
+    backup.value = data.data
+    if (data.result.error) toast.error(data.result.error)
+    else toast.success(`Backup selesai (${fileSize(data.result.size)})${data.result.drive === 'tersimpan' ? ', tersalin ke Google Drive' : ''}.`)
+  } catch (e) {
+    if (e.response?.data?.data) backup.value = e.response.data.data
+    toast.error(e.response?.data?.result?.error || errorMessage(e))
+  } finally {
+    backingUp.value = false
+  }
+}
+async function connectDrive() {
+  driveBusy.value = true
+  try {
+    const { data } = await http.post('/backups/google')
+    window.location.assign(data.url)
+  } catch (e) {
+    toast.error(errorMessage(e))
+    driveBusy.value = false
+  }
+}
+async function disconnectDrive() {
+  if (!(await confirmDialog({ title: 'Putuskan Google Drive', message: `Backup tidak lagi disalin ke ${backup.value.drive.email || 'Google Drive'}. File yang sudah ada di Drive tidak dihapus.`, confirmLabel: 'Putuskan', tone: 'danger' }))) return
+  driveBusy.value = true
+  try {
+    backup.value = (await http.delete('/backups/google')).data.data
+    toast.success('Google Drive diputuskan.')
+  } catch (e) {
+    toast.error(errorMessage(e))
+  } finally {
+    driveBusy.value = false
+  }
+}
+const downloadBackup = (file) => download(`/backups/files/${file.name}`, {}, file.name).catch((e) => toast.error(errorMessage(e)))
+// Dipasang setelah state backup dideklarasikan (immediate: dipanggil saat setup).
+watch(tab, (value) => value === 'maintenance' && allowed('maintenance') && (loadMaintenance(), loadBackup()), { immediate: true })
+
+// Kembali dari halaman persetujuan Google: tampilkan hasil lalu bersihkan alamat.
+const router = useRouter()
+const returned = useRoute().query
+if (returned.drive) {
+  if (returned.drive === 'ok') toast.success('Google Drive terhubung. Backup berikutnya akan disalin ke folder "Kanaka Backup".')
+  else toast.error(returned.pesan || 'Gagal menghubungkan Google Drive.')
+  router.replace({ query: { tab: 'maintenance' } })
+}
 
 // Keamanan: konfigurasi email & login Google dari .env (hanya ditampilkan) + email uji.
 const system = ref(null)
@@ -709,6 +775,72 @@ onMounted(async () => {
 
           <!-- Pemeliharaan -->
           <section v-else key="maintenance" class="space-y-5">
+            <div class="card space-y-4 p-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 class="font-semibold">Backup database</h2>
+                  <p class="text-sm text-slate-500">Otomatis setiap hari pukul 02:00: disimpan di server lalu disalin ke Google Drive. Backup lebih dari masa simpan dihapus otomatis (yang terbaru selalu disimpan).</p>
+                </div>
+                <button type="button" class="btn-secondary btn-sm" :disabled="backingUp" @click="runBackup"><AppIcon name="archive" :size="14" :class="{ 'animate-pulse': backingUp }" /> {{ backingUp ? 'Membuat backup…' : 'Backup sekarang' }}</button>
+              </div>
+
+              <template v-if="backup">
+                <div class="rounded-lg px-4 py-3 text-sm" :class="backup.last_run?.error ? 'bg-red-50 text-red-800' : backupStale ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'">
+                  <p v-if="!backup.last_run" class="font-medium">Belum pernah ada backup.</p>
+                  <template v-else>
+                    <p class="font-medium">
+                      Backup terakhir {{ dateTime(backup.last_run.ran_at) }}<template v-if="backup.last_run.file"> · {{ fileSize(backup.last_run.size) }}</template>
+                      <template v-if="driveLabels[backup.last_run.drive] && backup.last_run.drive !== 'dilewati'"> · {{ driveLabels[backup.last_run.drive] }}</template>
+                    </p>
+                    <p v-if="backup.last_run.error">{{ backup.last_run.error }}</p>
+                    <p v-else-if="backupStale">Backup berhasil terakhir lebih dari 2 hari lalu — periksa cron/scheduler di server.</p>
+                  </template>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div class="rounded-lg border border-slate-200 p-4">
+                    <p class="text-sm font-medium text-slate-800">Google Drive</p>
+                    <template v-if="!backup.drive.configured">
+                      <p class="mt-1 text-sm text-amber-700">Belum bisa dihubungkan: <code>GOOGLE_CLIENT_SECRET</code> belum diisi di server.</p>
+                      <p class="mt-1 text-xs break-all text-slate-500">Alamat redirect untuk Google Cloud Console: {{ backup.drive.redirect_uri }}</p>
+                    </template>
+                    <template v-else-if="backup.drive.connected">
+                      <p class="mt-1 text-sm text-emerald-700">Terhubung: <b>{{ backup.drive.email || 'akun Google' }}</b></p>
+                      <p class="text-xs text-slate-500">Folder "Kanaka Backup" · sejak {{ dateTime(backup.drive.connected_at) }}</p>
+                      <button type="button" class="btn-secondary btn-sm mt-2" :disabled="driveBusy" @click="disconnectDrive">Putuskan</button>
+                    </template>
+                    <template v-else>
+                      <p class="mt-1 text-sm text-slate-600">Belum terhubung — backup hanya tersimpan di server.</p>
+                      <button type="button" class="btn-primary btn-sm mt-2" :disabled="driveBusy" @click="connectDrive">Hubungkan Google Drive</button>
+                      <p class="mt-1 text-xs text-slate-500">Aplikasi hanya bisa melihat file yang dibuatnya sendiri, bukan isi Drive lainnya.</p>
+                    </template>
+                  </div>
+                  <div>
+                    <label class="label">Masa simpan backup</label>
+                    <div class="flex gap-2">
+                      <button v-for="days in backupRetention" :key="days" type="button" class="tab" :class="{ 'tab-active': Number(form.retention_backup_days) === days }" @click="form.retention_backup_days = days">{{ days }} hari</button>
+                    </div>
+                    <p v-if="errors.retention_backup_days" class="error-text">{{ errors.retention_backup_days }}</p>
+                    <p class="mt-1 text-xs text-slate-500">Berlaku di server &amp; Google Drive. Simpan dengan tombol Simpan pengaturan.</p>
+                  </div>
+                </div>
+
+                <div v-if="backup.files.length" class="table-wrap">
+                  <table class="table">
+                    <thead><tr><th>File di server</th><th>Waktu</th><th class="num">Ukuran</th><th></th></tr></thead>
+                    <tbody>
+                      <tr v-for="file in backup.files" :key="file.name">
+                        <td class="font-mono text-xs">{{ file.name }}</td>
+                        <td>{{ dateTime(file.created_at) }}</td>
+                        <td class="num">{{ fileSize(file.size) }}</td>
+                        <td class="text-right"><button type="button" class="btn-secondary btn-sm" @click="downloadBackup(file)">Unduh</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+
             <div class="card space-y-4 p-5">
               <div>
                 <h2 class="font-semibold">Masa simpan</h2>

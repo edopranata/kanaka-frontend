@@ -20,6 +20,7 @@ kanaka/
 
 | Modul | Isi |
 | --- | --- |
+| **Panduan** | Menu **Panduan** (`/panduan`) berisi alur harian kasir & gudang (titipan pagi → kasir → bon → penyelesaian & bayar penitip → pembelian → kas → closing → bila ada masalah); bisa **dicetak 1 halaman A4**. Tombol **?** di header membuka bagian yang sesuai halaman yang sedang dibuka. |
 | **Kasir (POS)** | Scan barcode / cari produk (produk stok 0 disembunyikan kecuali *Tampilkan stok 0* dicentang), keranjang, **promo otomatis** (tanpa input diskon manual), pajak (opsional), bayar tunai (hitung kembalian) / transfer / QRIS / kartu, cetak struk thermal 58/80mm, pelanggan. Shortcut: `F2` cari, `F8` bayar, `Enter` transaksi baru. **Anti transaksi ganda**: bila layar macet / koneksi putus lalu Bayar ditekan lagi (juga setelah muat ulang), transaksi yang sama dikembalikan, bukan dicatat dua kali (berlaku juga untuk bon & bayar piutang; batas tunggu 30 detik). |
 | **Penjualan kredit (bon)** | Menu terpisah dari kasir untuk "ambil dulu bayar nanti": pilih pelanggan, input barang (per satuan), cetak nota bon. Batas kredit per pelanggan (opsional). |
 | **Tagihan & piutang** | Tagihan bulanan per pelanggan dibuat **otomatis setiap tanggal 1 pukul 01:00** (atau manual kapan saja), cetak tagihan A4, cetak thermal (per bon, header & catatan kaki seperti struk) & unduh PDF, **pembayaran per baris bon** (bayar sebagian / lunas, sebelum atau sesudah ditagih) dengan bukti bayar thermal & riwayat pembayaran, saldo piutang per pelanggan, peringatan lewat jatuh tempo. |

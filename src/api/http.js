@@ -44,6 +44,11 @@ http.interceptors.response.use(
  */
 export function errorMessage(error) {
   if (!error.response) {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return error.config?.headers?.['Idempotency-Key']
+        ? 'Server tidak merespons. Silakan coba lagi — transaksi yang sama tidak akan tercatat dua kali.'
+        : 'Server terlalu lama merespons. Silakan coba lagi.'
+    }
     return navigator.onLine ? 'Tidak dapat terhubung ke server.' : 'Anda sedang offline.'
   }
   const data = error.response.data
@@ -60,6 +65,39 @@ export function validationErrors(error) {
   const errors = error.response?.status === 422 ? error.response.data.errors || {} : {}
   return Object.fromEntries(Object.entries(errors).map(([key, messages]) => [key, messages[0]]))
 }
+
+/** Batas waktu request transaksi: lebih dari ini dianggap gagal dan kasir boleh mencoba lagi dengan aman. */
+export const TRANSACTION_TIMEOUT = 30_000
+
+/** Kunci acak untuk satu transaksi (crypto.randomUUID hanya ada di HTTPS / localhost). */
+export function newIdempotencyKey() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Kunci transaksi yang dipakai ulang selama isi transaksinya sama. holder = { key, fingerprint } (boleh disimpan di
+ * localStorage bersama keranjang) — setelah layar macet / muat ulang, Bayar lagi memakai kunci yang sama sehingga server
+ * mengembalikan transaksi yang sudah tersimpan, bukan membuat yang baru. Isi berubah → kunci baru.
+ */
+export function transactionKey(holder, content) {
+  const fingerprint = JSON.stringify(content)
+  if (holder?.key && holder.fingerprint === fingerprint) return holder
+  return { key: newIdempotencyKey(), fingerprint }
+}
+
+/**
+ * POST transaksi sekali-jadi (kasir, bon, bayar piutang): header Idempotency-Key + batas waktu.
+ * response.replayed = true bila server mengembalikan transaksi yang sudah tersimpan sebelumnya.
+ */
+export async function postTransaction(url, data, key) {
+  const response = await http.post(url, data, { headers: { 'Idempotency-Key': key }, timeout: TRANSACTION_TIMEOUT })
+  response.replayed = response.headers['idempotent-replayed'] === 'true'
+  return response
+}
+
+export const REPLAYED_MESSAGE = 'Transaksi ini sudah tersimpan sebelumnya — tidak dicatat dua kali.'
 
 /**
  * Unduh file (Excel) dari endpoint yang membutuhkan token.

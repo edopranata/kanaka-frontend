@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import http, { errorMessage, validationErrors } from '../api/http'
+import http, { errorMessage, postTransaction, REPLAYED_MESSAGE, transactionKey, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { itemName, rupiah, tanggal } from '../utils/format'
@@ -31,6 +31,7 @@ const form = reactive({ payment_method: 'tunai', cash_account_id: null, received
 const errors = ref({})
 const saving = ref(false)
 const result = ref(null)
+let payKey = null // kunci anti transaksi ganda (lihat transactionKey)
 
 const lines = computed(() => sales.value.flatMap((sale) => sale.items))
 const outstanding = computed(() => lines.value.reduce((sum, line) => sum + line.amount, 0))
@@ -75,8 +76,10 @@ async function load() {
 async function pay() {
   saving.value = true
   errors.value = {}
+  payKey = transactionKey(payKey, { customer: props.customer.id, bill: props.billId, lines: [...selected.value].sort((a, b) => a - b) })
   try {
-    const { data } = await http.post('/receivable-payments', { customer_id: props.customer.id, customer_bill_id: props.billId, sale_item_ids: selected.value, ...form, received: isCash.value ? form.received : null })
+    const { data, replayed } = await postTransaction('/receivable-payments', { customer_id: props.customer.id, customer_bill_id: props.billId, sale_item_ids: selected.value, ...form, received: isCash.value ? form.received : null }, payKey.key)
+    if (replayed) toast.show(REPLAYED_MESSAGE, 'success', 6000)
     result.value = { payment: data.data, outstanding: data.outstanding }
     emit('paid', result.value)
   } catch (e) {

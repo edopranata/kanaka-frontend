@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import http, { errorMessage, validationErrors } from '../api/http'
+import http, { errorMessage, postTransaction, REPLAYED_MESSAGE, transactionKey, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah, tanggalAngka, taxLabel, today } from '../utils/format'
@@ -29,6 +29,7 @@ const errors = ref({})
 const saving = ref(false)
 const lastSale = ref(null)
 const confirming = ref(false)
+let payKey = null // kunci anti transaksi ganda (lihat transactionKey)
 const search = ref(null)
 
 watch(customer, async (value) => {
@@ -131,12 +132,12 @@ function confirmSave() {
 async function save() {
   saving.value = true
   errors.value = {}
+  const items = form.items.map((line) => ({ product_unit_id: line.unit_id, qty: Number(line.qty), omit: line.omit.length ? line.omit : undefined }))
+  payKey = transactionKey(payKey, { customer: customer.value.id, items })
   try {
-    const { data } = await http.post('/credit-sales', {
-      customer_id: customer.value.id,
-      items: form.items.map((line) => ({ product_unit_id: line.unit_id, qty: Number(line.qty), omit: line.omit.length ? line.omit : undefined })),
-      notes: form.notes || null,
-    })
+    const { data, replayed } = await postTransaction('/credit-sales', { customer_id: customer.value.id, items, notes: form.notes || null }, payKey.key)
+    if (replayed) toast.show(REPLAYED_MESSAGE, 'success', 6000)
+    payKey = null
     confirming.value = false
     lastSale.value = data.data
     if (printerConfig.autoPrint) nextTick(() => printReceipt(data.data))

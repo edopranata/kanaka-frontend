@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import http, { errorMessage, validationErrors } from '../api/http'
+import http, { errorMessage, postTransaction, REPLAYED_MESSAGE, transactionKey, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
@@ -92,7 +92,8 @@ async function scanToCart(code) {
 }
 
 // ---- Keranjang ----
-const cart = reactive({ items: [], customer: null, notes: '' })
+// pay: kunci anti transaksi ganda { key, fingerprint } — ikut tersimpan bersama keranjang (lihat transactionKey).
+const cart = reactive({ items: [], customer: null, notes: '', pay: null })
 
 // Promo aktif hari ini (diterapkan otomatis; dihitung ulang di server saat bayar).
 const promos = ref([])
@@ -211,7 +212,7 @@ function removeLine(index) {
 
 async function clearCart(ask = true) {
   if (ask && cart.items.length && !(await confirmDialog({ title: 'Kosongkan keranjang', message: `Hapus ${cart.items.length} barang dari keranjang?`, confirmLabel: 'Kosongkan', tone: 'danger', icon: 'cart' }))) return
-  Object.assign(cart, { items: [], customer: null, notes: '' })
+  Object.assign(cart, { items: [], customer: null, notes: '', pay: null })
   searchInput.value?.focus()
 }
 
@@ -285,15 +286,18 @@ async function pay() {
   }
   paying.value = true
   errors.value = {}
+  // Kunci yang sama selama isi keranjang sama: Bayar ulang setelah macet / muat ulang tidak membuat transaksi baru.
+  cart.pay = transactionKey(cart.pay, { customer: cart.customer?.id || null, items: cart.items.map((line) => [line.unit_id, Number(line.qty), line.omit || []]) })
   try {
-    const { data } = await http.post('/sales', {
+    const { data, replayed } = await postTransaction('/sales', {
       customer_id: cart.customer?.id || null,
       items: cart.items.map((line) => ({ product_unit_id: line.unit_id, qty: Number(line.qty), omit: line.omit?.length ? line.omit : undefined })),
       payment_method: payment.method,
       paid: payment.method === 'tunai' ? payment.paid : null,
       payment_ref: payment.ref || null,
       notes: cart.notes || null,
-    })
+    }, cart.pay.key)
+    if (replayed) toast.show(REPLAYED_MESSAGE, 'success', 6000)
     lastSale.value = data.data
     payModal.value = false
     if (printerConfig.autoPrint) nextTick(() => printReceipt(data.data))

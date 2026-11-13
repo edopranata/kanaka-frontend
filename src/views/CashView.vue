@@ -33,10 +33,18 @@ const statusStyles = {
 
 // ---- Akun ----
 const accounts = ref([])
-const myDrawer = computed(() => accounts.value.find((account) => account.is_mine))
+// Laci yang dipakai transaksi tunai saya sekarang (laci bersama bila ditetapkan pemilik, selain itu laci pribadi).
+const myDrawer = computed(() => accounts.value.find((account) => account.is_current) || accounts.value.find((account) => account.is_mine))
 const drawers = computed(() => accounts.value.filter((account) => account.type === 'fisik'))
 const banks = computed(() => accounts.value.filter((account) => account.type === 'bank'))
-const shownDrawers = computed(() => (manager ? [...drawers.value].sort((a, b) => b.is_mine - a.is_mine) : drawers.value.filter((account) => account.is_mine)))
+// Laci yang saya pegang: laci yang sedang dipakai + laci pribadi lama yang masih bersaldo.
+const heldDrawers = computed(() => drawers.value.filter((account) => account.is_mine && (account.is_current || account.balance || account.pending_out)))
+const shownDrawers = computed(() => (manager ? [...drawers.value].sort((a, b) => b.is_current - a.is_current || b.is_mine - a.is_mine) : heldDrawers.value))
+const drawerLabel = (account) => account.name.replace(/^Kas /, '')
+function drawerSubtitle(account) {
+  const base = account.is_shared ? `Laci bersama${account.members?.length ? ` · ${account.members.map((member) => member.name).join(', ')}` : ''}` : account.role || 'Kas fisik'
+  return base + (account.is_current ? ' · kas saya' : account.is_mine ? ' · laci pribadi lama' : '')
+}
 const totalDrawers = computed(() => drawers.value.reduce((sum, account) => sum + (account.balance || 0), 0))
 const totalBanks = computed(() => banks.value.reduce((sum, account) => sum + (account.balance || 0), 0))
 const available = (account) => (account?.balance || 0) - (account?.pending_out || 0)
@@ -124,7 +132,7 @@ function openTransfer(mode, account = null) {
 }
 
 const transferSource = computed(() => accounts.value.find((account) => account.id === transfer.value?.from_account_id))
-const handoverTargets = computed(() => drawers.value.filter((account) => !account.is_mine && account.is_active))
+const handoverTargets = computed(() => drawers.value.filter((account) => account.is_active && account.id !== transfer.value?.from_account_id))
 
 async function submitTransfer() {
   saving.value = true
@@ -183,6 +191,30 @@ async function submitAdjust() {
     await http.post(`/cash/accounts/${adjust.value.account.id}/adjust`, { amount: adjust.value.direction * (adjust.value.amount || 0), reason: adjust.value.reason })
     toast.success('Saldo disesuaikan.')
     adjust.value = null
+    refresh()
+  } catch (e) {
+    errors.value = validationErrors(e)
+    toast.error(errorMessage(e))
+  } finally {
+    saving.value = false
+  }
+}
+
+// ---- Laci kas bersama (pemilik/admin): anggota ditetapkan di menu Pengguna ----
+const drawerForm = ref(null)
+function openDrawer(account = null) {
+  errors.value = {}
+  drawerForm.value = account ? { id: account.id, name: account.name, is_active: account.is_active, balance: account.balance, members: account.members || [] } : { id: null, name: '', is_active: true, balance: 0, members: [] }
+}
+async function saveDrawer() {
+  saving.value = true
+  errors.value = {}
+  try {
+    const { id, name, is_active } = drawerForm.value
+    if (id) await http.put(`/cash/accounts/${id}`, { type: 'fisik', name, is_active })
+    else await http.post('/cash/accounts', { type: 'fisik', name })
+    toast.success(id ? 'Laci bersama disimpan.' : 'Laci bersama dibuat. Tetapkan pemakainya di menu Pengguna.')
+    drawerForm.value = null
     refresh()
   } catch (e) {
     errors.value = validationErrors(e)
@@ -278,7 +310,10 @@ onMounted(async () => {
     </div>
 
     <section class="mb-4">
-      <h2 class="mb-2 text-sm font-semibold text-slate-700">Kas fisik</h2>
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold text-slate-700">Kas fisik</h2>
+        <button v-if="canAccounts" class="btn-secondary btn-sm" @click="openDrawer()"><AppIcon name="plus" :size="14" /> Laci bersama</button>
+      </div>
       <div class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
         <button
           v-for="account in shownDrawers"
@@ -290,14 +325,17 @@ onMounted(async () => {
         >
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <p class="truncate font-medium text-slate-900">{{ account.name.replace(/^Kas /, '') }}</p>
-              <p class="text-xs text-slate-500">{{ account.role || 'Kas fisik' }}<template v-if="account.is_mine"> · kas saya</template></p>
+              <p class="truncate font-medium text-slate-900">{{ drawerLabel(account) }}</p>
+              <p class="text-xs text-slate-500">{{ drawerSubtitle(account) }}</p>
             </div>
             <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700"><AppIcon name="cash" :size="16" /></span>
           </div>
           <p class="mt-2 text-xl font-bold tabular-nums" :class="account.balance < 0 ? 'text-red-600' : 'text-slate-900'">{{ rupiah(account.balance) }}</p>
           <p v-if="account.pending_out" class="text-xs text-amber-700">{{ rupiah(account.pending_out) }} menunggu konfirmasi</p>
-          <p v-if="!account.is_active" class="text-xs text-slate-400">Pengguna nonaktif</p>
+          <p v-if="!account.is_active" class="text-xs text-slate-400">{{ account.is_shared ? 'Laci nonaktif' : 'Pengguna nonaktif' }}</p>
+          <span v-if="account.is_shared && canAccounts" class="mt-2 inline-block" @click.stop>
+            <span role="button" tabindex="0" class="btn-secondary btn-sm" @click="openDrawer(account)" @keydown.enter="openDrawer(account)">Ubah laci</span>
+          </span>
         </button>
       </div>
     </section>
@@ -439,6 +477,7 @@ onMounted(async () => {
         <div>
           <label class="label">Dari</label>
           <AppSelect v-if="transfer.mode === 'tarik'" v-model="transfer.from_account_id" class="input" :options="banks.filter((account) => account.is_active)" value-key="id" label-key="name" placeholder="Pilih rekening…" />
+          <AppSelect v-else-if="heldDrawers.length > 1" v-model="transfer.from_account_id" class="input" :options="heldDrawers" value-key="id" :label-key="(account) => `${drawerLabel(account)}${account.is_shared ? ' — laci bersama' : ' — laci pribadi'}`" />
           <p v-else class="input flex items-center bg-slate-50">{{ transferSource?.name }}</p>
           <p class="mt-1 text-xs text-slate-500">
             Saldo tersedia <b class="tabular-nums">{{ rupiah(available(transferSource)) }}</b>
@@ -465,7 +504,7 @@ onMounted(async () => {
             :class="{ 'input-error': errors.to_account_id }"
             :options="handoverTargets"
             value-key="id"
-            :label-key="(account) => `${account.name.replace(/^Kas /, '')}${account.role ? ` — ${account.role}` : ''}`"
+            :label-key="(account) => `${drawerLabel(account)}${account.is_shared ? ' — laci bersama' : account.role ? ` — ${account.role}` : ''}${account.is_mine ? ' (milik saya, langsung pindah)' : ''}`"
             placeholder="Pilih penerima…"
           />
           <p v-else class="input flex items-center bg-slate-50">{{ myDrawer?.name }}</p>
@@ -515,6 +554,31 @@ onMounted(async () => {
       <template #footer>
         <button class="btn-secondary" @click="adjust = null">Batal</button>
         <button class="btn-primary" type="submit" form="adjust-form" :disabled="saving || !adjust.amount">Simpan</button>
+      </template>
+    </AppModal>
+
+    <!-- Modal laci bersama -->
+    <AppModal v-if="drawerForm" :title="drawerForm.id ? 'Ubah Laci Bersama' : 'Laci Bersama Baru'" size="sm" @close="drawerForm = null">
+      <form id="drawer-form" class="space-y-3" @submit.prevent="saveDrawer">
+        <p class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+          Satu laci uang dipakai beberapa kasir: penjualan & pembayaran tunai mereka masuk ke laci ini (pencatat tetap tercatat per
+          transaksi) dan closing cukup sekali hitung. Pemakainya ditetapkan di menu <b>Pengguna</b>; kasir lain tetap memakai laci sendiri.
+        </p>
+        <div>
+          <label class="label">Nama laci</label>
+          <input v-model="drawerForm.name" class="input" :class="{ 'input-error': errors.name }" maxlength="100" placeholder="mis. Laci Depan" required />
+          <p v-if="errors.name" class="error-text">{{ errors.name }}</p>
+        </div>
+        <template v-if="drawerForm.id">
+          <p class="text-sm text-slate-600">Pemakai: <b>{{ drawerForm.members.map((member) => member.name).join(', ') || 'belum ada' }}</b></p>
+          <label class="flex items-center gap-2 text-sm"><input v-model="drawerForm.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300" /> Aktif</label>
+          <p v-if="!drawerForm.is_active" class="text-xs text-amber-700">Dinonaktifkan: pemakainya kembali ke laci pribadi masing-masing. Hanya bisa bila saldo laci {{ rupiah(0) }} (saat ini {{ rupiah(drawerForm.balance || 0) }}).</p>
+          <p v-if="errors.is_active" class="error-text">{{ errors.is_active }}</p>
+        </template>
+      </form>
+      <template #footer>
+        <button class="btn-secondary" @click="drawerForm = null">Batal</button>
+        <button class="btn-primary" type="submit" form="drawer-form" :disabled="saving || !drawerForm.name.trim()">{{ saving ? 'Menyimpan…' : 'Simpan' }}</button>
       </template>
     </AppModal>
 

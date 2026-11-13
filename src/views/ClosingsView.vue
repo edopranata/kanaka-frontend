@@ -43,7 +43,7 @@ async function loadHistory(page = 1) {
   }
 }
 
-// ---- Closing manual: kas fisik dihitung per pengguna ----
+// ---- Closing manual: kas fisik dihitung per laci (laci pribadi atau laci bersama) ----
 const modal = ref(false)
 const form = reactive({ notes: '' })
 const actual = reactive({})
@@ -191,7 +191,7 @@ onMounted(() => {
           Setelah closing manual hari ini, transaksi berikutnya otomatis masuk ke tanggal usaha <b>besok</b>.
         </p>
         <p class="mt-3 text-sm text-slate-600">
-          Kas fisik dihitung <b>per pengguna</b>. Saldo akhir tiap kas otomatis menjadi saldo awal besok.
+          Kas fisik dihitung <b>per laci</b> (laci pribadi tiap pengguna atau laci bersama). Saldo akhir tiap laci otomatis menjadi saldo awal besok.
           Total kas fisik saat ini: <b class="tabular-nums">{{ rupiah(status.summary.expected_cash) }}</b>.
         </p>
         <p class="mt-3 text-xs text-slate-500">Terakhir di-closing: {{ status.last_closed_date ? tanggal(status.last_closed_date) : 'belum pernah' }}</p>
@@ -238,7 +238,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <div class="min-w-0 space-y-3">
           <div>
-            <p class="font-semibold text-slate-900">Hitung kas fisik per pengguna</p>
+            <p class="font-semibold text-slate-900">Hitung kas fisik per laci</p>
             <p class="text-xs text-slate-500">Isi uang yang benar-benar ada di tangan / laci masing-masing. Saldo awal = saldo akhir closing sebelumnya.</p>
           </div>
           <p v-if="errors.counts" class="error-text">{{ errors.counts }}</p>

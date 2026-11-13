@@ -203,6 +203,7 @@ Menu **Kas & Bank** memisahkan uang per akun:
 | Akun | Isi |
 | --- | --- |
 | **Kas fisik** (satu per pengguna, dibuat otomatis) | Penjualan & pelunasan piutang **tunai** yang dicatat pengguna itu, pembelian, pengeluaran & bayar titipan tunai yang ia bayar, serta perpindahan kas. |
+| **Laci bersama** (opsional, dibuat pemilik/admin) | Satu laci uang dipakai beberapa kasir: di *Kas & Bank → + Laci bersama* buat lacinya (mis. "Laci Depan"), lalu di *Pengguna* pilih **Laci kas** untuk kasir yang memakainya. Semua transaksi tunai mereka masuk ke laci itu (pencatat tetap tercatat per transaksi), anggota mana pun boleh menyerahkan/menerima kasnya, dan closing cukup **sekali hitung**. Default tetap 1 kasir 1 laci; saldo lama di laci pribadi tetap tercatat sampai diserahkan. Laci hanya bisa dinonaktifkan bila saldonya 0 (anggota kembali ke laci pribadi). |
 | **Rekening bank** (dikelola pemilik/admin) | Transaksi **Transfer, QRIS, Kartu, Virtual Account** (VA hanya untuk pembayaran keluar/pelunasan, tidak di kasir). Rekening tujuan per metode diatur di *Pengaturan → Closing, Kas & Tagihan*; pengeluaran/pembayaran non tunai bisa memilih rekening. |
 
 Perpindahan kas (nomor `KAS-…`, prefix bisa diubah):
@@ -384,6 +385,13 @@ Test backend: `cd backend && php artisan test`
    simulasi: `php artisan maintenance:cleanup --dry-run`.
    Jika server sempat mati saat tengah malam, closing yang tertinggal dikerjakan pada jam berikutnya
    (atau jalankan manual `php artisan closing:auto`).
+   **Backup database harian** (`backup:run`, 02:00): dump MySQL terkompresi di `storage/app/backups/kanaka-db-*.sql.gz`
+   lalu disalin ke folder **"Kanaka Backup" di Google Drive** pemilik; backup lebih dari 7/14/30 hari (Pengaturan →
+   Pemeliharaan) dihapus di server & Drive, yang terbaru selalu disimpan. Status, *Backup sekarang*, unduh, dan
+   *Hubungkan Google Drive* ada di **Pengaturan → Pemeliharaan**. Google Drive memakai client OAuth login Google:
+   isi `GOOGLE_CLIENT_SECRET` di `.env`, lalu di Google Cloud Console aktifkan **Google Drive API**, tambahkan URI
+   redirect `https://<domain>/api/v1/backups/google/callback`, dan set OAuth consent screen ke *In production*
+   (izin `drive.file`: aplikasi hanya melihat file buatannya sendiri). Tanpa rclone / paket tambahan.
 3. **Frontend disajikan Laravel (paling sederhana, satu domain)**: di folder `frontend` jalankan
    ```
    npm run build:laravel

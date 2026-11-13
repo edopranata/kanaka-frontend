@@ -30,6 +30,11 @@ onMounted(loadAppInfo)
         <slot />
       </div>
       <slot name="after" />
+      <p class="mt-6 text-center text-xs text-brand-100">
+        <RouterLink :to="{ name: 'privacy' }" class="hover:underline">Kebijakan Privasi</RouterLink>
+        <span class="mx-2 opacity-60">·</span>
+        <RouterLink :to="{ name: 'terms' }" class="hover:underline">Ketentuan Layanan</RouterLink>
+      </p>
     </div>
   </div>
 </template>

@@ -55,8 +55,29 @@ export function errorMessage(error) {
   if (data?.errors) {
     return Object.values(data.errors).flat()[0]
   }
+  // Pesan bawaan Laravel/Symfony berbahasa Inggris (tidak lewat terjemahan) → pesan Indonesia per status.
+  const status = error.response.status
+  if (status in STATUS_MESSAGES && (!data?.message || ENGLISH_MESSAGES.includes(data.message))) {
+    return STATUS_MESSAGES[status]
+  }
   return data?.message || 'Terjadi kesalahan.'
 }
+
+const STATUS_MESSAGES = {
+  401: 'Sesi login berakhir. Silakan masuk kembali.',
+  403: 'Anda tidak memiliki akses untuk tindakan ini.',
+  404: 'Data tidak ditemukan.',
+  405: 'Permintaan tidak didukung.',
+  413: 'File terlalu besar.',
+  419: 'Halaman kedaluwarsa. Muat ulang lalu coba lagi.',
+  429: 'Terlalu banyak percobaan. Tunggu sekitar 1 menit, lalu coba lagi.',
+  500: 'Terjadi kesalahan di server. Coba lagi; bila berulang, hubungi pengelola.',
+  503: 'Aplikasi sedang dalam pemeliharaan. Coba lagi beberapa saat lagi.',
+}
+const ENGLISH_MESSAGES = [
+  'Unauthenticated.', 'This action is unauthorized.', 'Forbidden', 'Not Found', 'Method Not Allowed', 'Content Too Large', 'Payload Too Large',
+  'Page Expired', 'CSRF token mismatch.', 'Too Many Attempts.', 'Too Many Requests', 'Server Error', 'Service Unavailable',
+]
 
 /**
  * Error validasi per field: { field: 'pesan' }.

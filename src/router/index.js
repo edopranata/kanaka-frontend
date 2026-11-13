@@ -19,6 +19,9 @@ const routes = [
     component: view('ReceiptPublicView'),
     meta: { public: true, title: 'Struk digital' },
   },
+  // Kebijakan Privasi & Ketentuan Layanan (publik; dibutuhkan layar persetujuan Google).
+  { path: '/privasi', name: 'privacy', component: view('LegalView'), meta: { public: true, title: 'Kebijakan Privasi' } },
+  { path: '/ketentuan', name: 'terms', component: view('LegalView'), meta: { public: true, title: 'Ketentuan Layanan' } },
   // Tautan pendek untuk QR di struk (QR lebih kecil & cepat dicetak).
   { path: '/s/:token', redirect: (to) => ({ name: 'public-receipt', params: { token: to.params.token } }) },
   {

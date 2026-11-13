@@ -29,6 +29,8 @@ const issued = ref(null)
 const busy = ref('')
 
 const roles = ref([])
+// Laci kas bersama aktif (dibuat di Kas & Bank); kosong = laci pribadi.
+const sharedDrawers = ref([])
 // Role yang boleh diberikan oleh pengguna yang sedang login (akses tidak melebihi miliknya).
 const assignable = () => roles.value.filter((role) => role.manageable)
 
@@ -36,12 +38,13 @@ async function load() {
   const [usersResponse, rolesResponse] = await Promise.all([http.get('/users'), http.get('/roles')])
   users.value = usersResponse.data.data
   roles.value = rolesResponse.data.data
+  http.get('/cash/accounts').then(({ data }) => (sharedDrawers.value = data.data.filter((account) => account.is_shared && account.is_active))).catch(() => {})
 }
 
 function openForm(user = null) {
   errors.value = {}
   const kasir = assignable().find((role) => role.slug === 'kasir') || assignable().at(-1)
-  form.value = user ? { ...user } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true }
+  form.value = user ? { ...user } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true, cash_account_id: null }
 }
 
 const formatDate = (value) => new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
@@ -62,8 +65,8 @@ function mailResult(data) {
 async function save() {
   saving.value = true
   errors.value = {}
-  const { id, name, username, email, role_id, is_active } = form.value
-  const payload = { name, username, email, role_id, is_active }
+  const { id, name, username, email, role_id, is_active, cash_account_id } = form.value
+  const payload = { name, username, email, role_id, is_active, cash_account_id: cash_account_id || null }
   try {
     if (id) {
       await http.put(`/users/${id}`, payload)
@@ -167,7 +170,10 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
                 </span>
               </td>
               <td>{{ user.username }}</td>
-              <td>{{ user.role_label }}</td>
+              <td>
+                {{ user.role_label }}
+                <span v-if="user.cash_drawer" class="ml-1 rounded bg-brand-50 px-1.5 py-0.5 text-xs font-medium text-brand-700" title="Memakai laci kas bersama">{{ user.cash_drawer }}</span>
+              </td>
               <td>{{ user.email || '-' }}</td>
               <td>
                 <div class="flex flex-wrap gap-1">
@@ -226,6 +232,21 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
             :disabled="form.id === auth.user?.id"
           />
           <p v-if="errors.role_id" class="error-text">{{ errors.role_id }}</p>
+        </div>
+        <div v-if="sharedDrawers.length || form.cash_account_id">
+          <label class="label">Laci kas</label>
+          <AppSelect
+            v-model="form.cash_account_id"
+            class="input"
+            :class="{ 'input-error': errors.cash_account_id }"
+            :options="sharedDrawers"
+            value-key="id"
+            label-key="name"
+            empty="Laci pribadi (default)"
+            :empty-value="null"
+          />
+          <p v-if="errors.cash_account_id" class="error-text">{{ errors.cash_account_id }}</p>
+          <p v-else class="mt-1 text-xs text-slate-500">Laci bersama: uang tunai kasir ini masuk ke laci yang sama dengan kasir lain; closing sekali hitung.</p>
         </div>
         <p v-if="!form.id" class="flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800 sm:col-span-2">
           <AppIcon name="inbox" :size="16" class="mt-px shrink-0" />

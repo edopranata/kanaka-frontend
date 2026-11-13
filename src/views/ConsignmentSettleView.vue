@@ -159,7 +159,17 @@ onMounted(async () => {
                   selisih {{ lineCalc(line).shrink > 0 ? '+' : '' }}{{ lineCalc(line).shrink }}
                 </p>
               </td>
-              <td class="num"><input v-model.number="line.returned" type="number" min="0" :max="line.remaining" class="input ml-auto h-10 w-20 py-0 text-right" :disabled="!line.include" @focus="$event.target.select()" /></td>
+              <td class="num">
+                <input v-model.number="line.returned" type="number" min="0" :max="line.remaining" class="input ml-auto h-10 w-20 py-0 text-right" :disabled="!line.include" @focus="$event.target.select()" />
+                <button
+                  v-if="line.include && Number(line.remaining) > 0 && Number(line.returned) !== Number(line.remaining)"
+                  type="button"
+                  class="mt-1 text-xs font-medium text-brand-700 hover:underline"
+                  @click="line.returned = Number(line.remaining) || 0"
+                >
+                  Retur semua ({{ number(Number(line.remaining) || 0) }})
+                </button>
+              </td>
               <td class="num"><div class="flex h-10 items-center justify-end text-slate-600">{{ number(lineCalc(line).carried) }}</div></td>
               <td class="num"><div class="flex h-10 items-center justify-end font-semibold">{{ number(lineCalc(line).sold) }} {{ line.unit }}</div></td>
               <td class="num"><div class="flex h-10 items-center justify-end font-semibold">{{ rupiah(lineCalc(line).amount, false) }}</div></td>
@@ -189,7 +199,19 @@ onMounted(async () => {
             <button type="button" class="tab" :class="{ 'tab-active bg-brand-50': !form.pay_now }" @click="form.pay_now = false">Bayar nanti (hutang)</button>
             <button type="button" class="tab" :class="{ 'tab-active bg-brand-50': form.pay_now }" @click="form.pay_now = true">Bayar sekarang</button>
           </div>
-          <AppSelect v-if="form.pay_now" v-model="form.payment_method" class="input" :options="meta.payment_methods" />
+          <div v-if="form.pay_now" class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button
+              v-for="method in meta.payment_methods"
+              :key="method.value"
+              type="button"
+              class="rounded-lg border px-2 py-2.5 text-sm font-medium"
+              :class="form.payment_method === method.value ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white hover:bg-slate-50'"
+              @click="form.payment_method = method.value"
+            >
+              {{ method.label.replace('Kartu Debit/Kredit', 'Kartu Debit') }}
+            </button>
+          </div>
+          <p v-if="form.pay_now && form.payment_method !== 'tunai'" class="text-xs text-slate-500">Mengurangi saldo rekening bank.</p>
           <p v-if="form.pay_now && form.payment_method === 'tunai'" class="text-xs text-slate-500">Diambil dari kas fisik Anda — otomatis tercatat di Kas &amp; Bank.</p>
           <BankSelect v-if="form.pay_now" v-model="form.cash_account_id" :method="form.payment_method" label="Dari rekening" />
           <button class="btn-primary w-full" :disabled="saving || !included.length" @click="save">

@@ -14,6 +14,7 @@ import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import AppSelect from '../components/AppSelect.vue'
+import PaymentMethodButtons from '../components/PaymentMethodButtons.vue'
 import DateInput from '../components/DateInput.vue'
 import { confirmDialog } from '../stores/confirm'
 
@@ -151,7 +152,7 @@ onMounted(() => load())
         </div>
         <div>
           <label class="label">Dibayar dengan</label>
-          <AppSelect v-model="form.payment_method" class="input" :options="meta.payment_methods" />
+          <PaymentMethodButtons v-model="form.payment_method" />
           <p class="mt-1 text-xs text-slate-500">{{ form.payment_method === 'tunai' ? `Tunai = diambil dari kas fisik ${form.id ? 'pencatat' : 'Anda'}.` : 'Non tunai = diambil dari rekening bank.' }}</p>
         </div>
         <BankSelect v-model="form.cash_account_id" :method="form.payment_method" label="Dari rekening" />

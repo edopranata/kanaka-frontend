@@ -385,6 +385,31 @@ export function billBytes(bill, { store, template = {}, columns, feed = 3, cut =
  * @param {object} payment  data pembayaran dari API (/receivable-payments), termasuk items
  * @param {{ store: object, columns: number, outstanding?: number|null, feed?: number, cut?: boolean }} options
  */
+/**
+ * Bukti bayar titipan ke penitip (bayar sekaligus beberapa penyelesaian): rincian per hari, total, metode, sisa hutang.
+ */
+export function consignmentPaymentBytes(payment, { store, columns, outstanding = null, feed = 3, cut = true }) {
+  const doc = new EscPos(columns)
+  header(doc, store).separator()
+  doc.bold(true).center('BUKTI BAYAR TITIPAN').bold(false)
+  doc.pair('Tanggal', payment.created_at ? waktu(payment.created_at) : dmy(payment.date))
+  doc.pair('Penitip', payment.supplier?.name ?? '-')
+  doc.pair('Dibayar oleh', payment.user ?? '-')
+  doc.separator()
+  for (const line of payment.lines || []) doc.pair(`${line.number} (${dmy(line.date)})`, rp(line.amount))
+  doc.separator()
+  doc.bold(true).size(1, 2).pair('TOTAL BAYAR', rp(payment.total)).size(1, 1).bold(false)
+  doc.pair('Metode', payment.payment_label ?? '-')
+  if (outstanding !== null && outstanding !== undefined) doc.pair('Sisa hutang', rp(outstanding))
+  doc.line()
+  doc.pair('Penerima', `( ${payment.supplier?.name ?? ''} )`)
+  doc.separator()
+  footerLines(store.receipt_footer).forEach((line) => doc.center(line))
+  doc.feed(feed)
+  if (cut) doc.cut()
+  return doc.build()
+}
+
 export function paymentBytes(payment, { store, columns, outstanding = null, feed = 3, cut = true }) {
   const doc = new EscPos(columns)
   header(doc, store).separator()

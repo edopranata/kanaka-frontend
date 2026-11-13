@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah, tanggal, today } from '../utils/format'
+import { isoDate, number, rupiah, tanggal, tanggalAngka, today } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
 import BankSelect from '../components/BankSelect.vue'
@@ -19,7 +19,21 @@ const toast = useToastStore()
 
 const suppliers = ref([])
 const meta = useMetaStore()
-const form = reactive({ date: today(), supplier_id: '', invoice_ref: '', discount: 0, notes: '', payment_method: 'tunai', cash_account_id: null, items: [] })
+// payment_term: lunas (dibayar sekarang) | tempo (hutang supplier sampai due_date; paid_now = uang muka opsional).
+const form = reactive({ date: today(), supplier_id: '', invoice_ref: '', discount: 0, notes: '', payment_term: 'lunas', due_date: '', paid_now: 0, payment_method: 'tunai', cash_account_id: null, items: [] })
+const tempo = computed(() => form.payment_term === 'tempo')
+const dueOptions = [3, 7, 14, 30]
+const addDays = (date, days) => {
+  const value = new Date(`${date}T00:00:00`)
+  value.setDate(value.getDate() + days)
+  return isoDate(value)
+}
+function setTerm(term) {
+  form.payment_term = term
+  if (term === 'tempo' && !form.due_date) form.due_date = addDays(form.date, 3)
+}
+// Uang yang keluar sekarang: lunas = total; tempo = uang muka.
+const payNow = computed(() => (tempo.value ? Math.min(Number(form.paid_now) || 0, total.value) : total.value))
 const drawer = ref(null)
 const errors = ref({})
 const saving = ref(false)
@@ -63,7 +77,7 @@ const lineCount = (item) => (Number(item.qty) || 0) * item.conversion
 const zeroCost = computed(() => form.items.filter((item) => !item.cost))
 const badQty = computed(() => form.items.filter((item) => !(Number(item.qty) > 0)))
 const supplierName = computed(() => suppliers.value.find((supplier) => supplier.id === form.supplier_id)?.name)
-const drawerShort = computed(() => (form.payment_method === 'tunai' && drawer.value ? Math.max(0, total.value - (drawer.value.balance - (drawer.value.pending_out || 0))) : 0))
+const drawerShort = computed(() => (form.payment_method === 'tunai' && drawer.value && payNow.value ? Math.max(0, payNow.value - (drawer.value.balance - (drawer.value.pending_out || 0))) : 0))
 
 /** Perkiraan HPP per satuan dasar setelah pembelian (rata-rata bergerak, diskon faktur dibagi proporsional). */
 function newCost(item) {
@@ -96,11 +110,14 @@ async function submit() {
     const { data } = await http.post('/purchases', {
       ...form,
       supplier_id: form.supplier_id || null,
+      due_date: tempo.value ? form.due_date : null,
+      paid_now: tempo.value ? Number(form.paid_now) || 0 : null,
+      payment_method: tempo.value && !payNow.value ? null : form.payment_method,
       cash_account_id: form.payment_method === 'tunai' ? null : form.cash_account_id,
       items: form.items.map(({ product_id, unit_id, qty, cost }) => ({ product_id, product_unit_id: unit_id, qty, cost })),
     })
     confirming.value = false
-    toast.success(`Pembelian ${data.data.number} disimpan. Stok bertambah.`)
+    toast.success(tempo.value ? `Pembelian tempo ${data.data.number} disimpan. Stok bertambah; hutang ${rupiah(data.data.remaining)} jatuh tempo ${tanggalAngka(data.data.due_date)}.` : `Pembelian ${data.data.number} disimpan. Stok bertambah.`)
     router.replace({ name: 'purchase', params: { id: data.data.id } })
   } catch (e) {
     confirming.value = false
@@ -112,7 +129,7 @@ async function submit() {
 }
 
 onMounted(async () => {
-  http.get('/cash/accounts').then(({ data }) => (drawer.value = data.data.find((account) => account.is_mine))).catch(() => {})
+  http.get('/cash/accounts').then(({ data }) => (drawer.value = data.data.find((account) => account.is_current) || data.data.find((account) => account.is_mine))).catch(() => {})
   const { data } = await http.get('/suppliers', { params: { per_page: 200 } })
   suppliers.value = data.data
 })
@@ -139,7 +156,31 @@ onMounted(async () => {
         </div>
         <div>
           <label class="label">Pembayaran</label>
-          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+          <div class="mb-3 grid grid-cols-2 gap-2">
+            <button type="button" class="rounded-lg border px-2 py-2 text-sm font-medium transition" :class="!tempo ? 'border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-600' : 'border-slate-300 hover:bg-slate-50'" @click="setTerm('lunas')">Lunas sekarang</button>
+            <button type="button" class="rounded-lg border px-2 py-2 text-sm font-medium transition" :class="tempo ? 'border-brand-600 bg-brand-50 text-brand-800 ring-1 ring-brand-600' : 'border-slate-300 hover:bg-slate-50'" @click="setTerm('tempo')">Tempo (bayar nanti)</button>
+          </div>
+          <template v-if="tempo">
+            <div class="space-y-3 rounded-lg bg-slate-50 p-3">
+              <div>
+                <label class="label">Jatuh tempo</label>
+                <DateInput v-model="form.due_date" class="input" :min="form.date" :class="{ 'input-error': errors.due_date }" />
+                <div class="mt-1.5 flex flex-wrap gap-1">
+                  <button v-for="days in dueOptions" :key="days" type="button" class="tab" :class="{ 'tab-active': form.due_date === addDays(form.date, days) }" @click="form.due_date = addDays(form.date, days)">+{{ days }} hari</button>
+                </div>
+                <p v-if="errors.due_date" class="error-text">{{ errors.due_date }}</p>
+              </div>
+              <div>
+                <label class="label">Uang muka (opsional)</label>
+                <MoneyInput v-model="form.paid_now" :invalid="!!errors.paid_now" />
+                <p v-if="errors.paid_now" class="error-text">{{ errors.paid_now }}</p>
+                <p v-else class="mt-1 text-xs text-slate-500">Stok langsung bertambah; uang keluar saat dibayar (menu Pembelian → Bayar).</p>
+              </div>
+              <p v-if="errors.supplier_id" class="error-text">{{ errors.supplier_id }}</p>
+            </div>
+            <p v-if="payNow" class="mt-3 mb-1.5 text-xs font-medium text-slate-600">Uang muka dibayar dengan</p>
+          </template>
+          <div v-if="!tempo || payNow" class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
             <button
               v-for="method in meta.payment_methods"
               :key="method.value"
@@ -152,18 +193,19 @@ onMounted(async () => {
             </button>
           </div>
           <p v-if="errors.payment_method" class="error-text">{{ errors.payment_method }}</p>
-          <template v-if="form.payment_method === 'tunai'">
+          <template v-if="tempo && !payNow" />
+          <template v-else-if="form.payment_method === 'tunai'">
             <p class="mt-2 text-xs text-slate-500">
               Diambil dari kas fisik Anda<template v-if="drawer"> — saldo <b class="tabular-nums">{{ rupiah(drawer.balance) }}</b></template>.
             </p>
-            <p v-if="drawer && total > drawer.balance - (drawer.pending_out || 0)" class="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
-              <AppIcon name="alert" :size="12" class="inline" /> Kas Anda kurang {{ rupiah(total - drawer.balance + (drawer.pending_out || 0)) }}.
+            <p v-if="drawerShort" class="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+              <AppIcon name="alert" :size="12" class="inline" /> Kas Anda kurang {{ rupiah(drawerShort) }}.
               Minta serah terima kas dari pemilik/admin, atau pilih pembayaran non tunai.
             </p>
           </template>
           <p v-else class="mt-2 text-xs text-slate-500">Mengurangi saldo rekening bank.</p>
         </div>
-        <BankSelect v-model="form.cash_account_id" :method="form.payment_method" label="Dari rekening" />
+        <BankSelect v-if="!tempo || payNow" v-model="form.cash_account_id" :method="form.payment_method" label="Dari rekening" />
         <div>
           <label class="label">Catatan</label>
           <textarea v-model="form.notes" rows="2" class="input" />
@@ -226,7 +268,8 @@ onMounted(async () => {
             <div class="w-44"><MoneyInput v-model="form.discount" :invalid="!!errors.discount" /></div>
           </div>
           <div class="flex items-baseline justify-between"><span class="font-semibold">Total</span><span class="text-xl font-bold text-brand-700 tabular-nums">{{ rupiah(total) }}</span></div>
-          <div class="flex justify-between text-xs text-slate-500"><span>Dibayar dengan</span><span>{{ meta.paymentLabel(form.payment_method) }}</span></div>
+          <div v-if="tempo" class="flex justify-between text-xs text-slate-500"><span>Tempo · jatuh tempo {{ form.due_date ? tanggalAngka(form.due_date) : '-' }}</span><span>hutang {{ rupiah(total - payNow) }}</span></div>
+          <div v-else class="flex justify-between text-xs text-slate-500"><span>Dibayar dengan</span><span>{{ meta.paymentLabel(form.payment_method) }}</span></div>
           <div class="flex justify-end gap-2 pt-2">
             <RouterLink :to="{ name: 'purchases' }" class="btn-secondary">Batal</RouterLink>
             <button class="btn-primary" :disabled="saving || !form.items.length" @click="save">{{ saving ? 'Menyimpan…' : 'Simpan Pembelian' }}</button>
@@ -287,11 +330,16 @@ onMounted(async () => {
             <div class="flex justify-between border-t border-slate-200 pt-1 text-base font-bold"><span>Total</span><span class="text-brand-700 tabular-nums">{{ rupiah(total) }}</span></div>
           </div>
           <div class="space-y-1 rounded-xl bg-slate-50 p-3">
-            <div class="flex justify-between"><span class="text-slate-500">Dibayar dengan</span><span class="font-medium">{{ meta.paymentLabel(form.payment_method) }}</span></div>
-            <p v-if="form.payment_method === 'tunai'" class="text-xs text-slate-500">
-              Mengurangi kas fisik Anda<template v-if="drawer">: {{ rupiah(drawer.balance) }} → <b :class="drawer.balance - total < 0 ? 'text-red-600' : ''">{{ rupiah(drawer.balance - total) }}</b></template>
+            <template v-if="tempo">
+              <div class="flex justify-between"><span class="text-slate-500">Pembayaran</span><span class="font-medium">Tempo · jatuh tempo {{ form.due_date ? tanggalAngka(form.due_date) : '-' }}</span></div>
+              <div v-if="payNow" class="flex justify-between"><span class="text-slate-500">Uang muka ({{ meta.paymentLabel(form.payment_method) }})</span><span class="tabular-nums">{{ rupiah(payNow) }}</span></div>
+              <div class="flex justify-between font-semibold text-amber-700"><span>Hutang ke {{ supplierName || 'supplier' }}</span><span class="tabular-nums">{{ rupiah(total - payNow) }}</span></div>
+            </template>
+            <div v-else class="flex justify-between"><span class="text-slate-500">Dibayar dengan</span><span class="font-medium">{{ meta.paymentLabel(form.payment_method) }}</span></div>
+            <p v-if="payNow && form.payment_method === 'tunai'" class="text-xs text-slate-500">
+              Mengurangi kas fisik Anda<template v-if="drawer">: {{ rupiah(drawer.balance) }} → <b :class="drawer.balance - payNow < 0 ? 'text-red-600' : ''">{{ rupiah(drawer.balance - payNow) }}</b></template>
             </p>
-            <p v-else class="text-xs text-slate-500">Mengurangi saldo rekening bank.</p>
+            <p v-else-if="payNow" class="text-xs text-slate-500">Mengurangi saldo rekening bank.</p>
             <p v-if="drawerShort" class="rounded-lg bg-amber-100 px-2 py-1 text-xs text-amber-800">Kas Anda kurang {{ rupiah(drawerShort) }} — saldo kas akan minus.</p>
           </div>
         </div>

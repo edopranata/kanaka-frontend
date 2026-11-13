@@ -11,7 +11,7 @@ import AppModal from '../components/AppModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import AppSelect from '../components/AppSelect.vue'
+import PaymentMethodButtons from '../components/PaymentMethodButtons.vue'
 import { useAuthStore } from '../stores/auth'
 import { confirmDialog } from '../stores/confirm'
 
@@ -167,8 +167,8 @@ onMounted(load)
           <p v-if="payErrors.amount" class="error-text">{{ payErrors.amount }}</p>
         </div>
         <div>
-          <label class="label">Metode</label>
-          <AppSelect v-model="payForm.payment_method" class="input" :options="meta.payment_methods" />
+          <label class="label">Metode pembayaran</label>
+          <PaymentMethodButtons v-model="payForm.payment_method" />
           <p class="mt-1 text-xs text-slate-500">{{ payForm.payment_method === 'tunai' ? 'Tunai diambil dari kas fisik Anda.' : 'Non tunai diambil dari rekening bank.' }}</p>
         </div>
         <BankSelect v-model="payForm.cash_account_id" :method="payForm.payment_method" label="Dari rekening" />

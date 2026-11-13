@@ -11,6 +11,7 @@ import PaginationBar from '../components/PaginationBar.vue'
 import StatCard from '../components/StatCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
+import ConsignmentPayModal from '../components/ConsignmentPayModal.vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -27,6 +28,8 @@ const settlementMeta = ref(null)
 const outstanding = ref(0)
 const filters = reactive({ status: 'terbuka' })
 const loading = ref(false)
+// Bayar sekaligus beberapa penyelesaian satu penitip.
+const paying = ref(null)
 
 async function loadSummary() {
   const { data } = await http.get('/consignments/summary')
@@ -107,7 +110,10 @@ onMounted(() => switchTab(tab.value))
                   <td>{{ row.last_settled ? tanggal(row.last_settled) : 'Belum pernah' }}</td>
                   <td class="num font-semibold" :class="{ 'text-red-600': row.outstanding }">{{ rupiah(row.outstanding, false) }}</td>
                   <td class="text-right">
-                    <RouterLink v-if="row.open_qty && auth.can('consignments.settle')" :to="{ name: 'consignment-settle', query: { supplier_id: row.supplier.id } }" class="btn-secondary btn-sm">Selesaikan</RouterLink>
+                    <div class="flex justify-end gap-1.5">
+                      <button v-if="row.outstanding && auth.can('consignments.pay')" type="button" class="btn-primary btn-sm" @click="paying = row.supplier">Bayar</button>
+                      <RouterLink v-if="row.open_qty && auth.can('consignments.settle')" :to="{ name: 'consignment-settle', query: { supplier_id: row.supplier.id } }" class="btn-secondary btn-sm">Selesaikan</RouterLink>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -176,5 +182,6 @@ onMounted(() => switchTab(tab.value))
         </div>
       </div>
     </Transition>
+    <ConsignmentPayModal v-if="paying" :supplier="paying" @close="paying = null" @paid="loadSummary" />
   </div>
 </template>

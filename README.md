@@ -27,7 +27,7 @@ kanaka/
 | **Riwayat penjualan** | Filter tanggal/status/metode, detail, cetak ulang struk, **void** (stok kembali, wajib alasan). |
 | **Produk & kategori** | Master produk (SKU, barcode, kategori, satuan dasar, HPP, stok minimum) terpisah dari **satuan & harga jual**: satu produk bisa dijual per PCS, BOX isi 6, DUS isi 40, dst. dengan harga masing-masing (harga grosir tidak harus = isi × harga eceran) dan barcode per satuan. Import dari Excel (format iPOS). |
 | **Paket / menu olahan** | Produk racikan dari beberapa bahan (mis. Indomie Telur = Indomie + Telur + jasa masak). Stok diambil dari bahan; ketersediaan dihitung dari bahan utama; bahan opsional bisa dihilangkan saat pesan dengan potongan harga. |
-| **Pembelian** | Barang masuk dari supplier. Stok bertambah, **HPP rata-rata bergerak** dihitung ulang, diskon faktur dibebankan ke HPP. Dibayar **tunai** (mengurangi kas fisik pencatat) atau **non tunai** — Transfer, QRIS, Virtual Account, Kartu Debit (mengurangi rekening bank). Bisa dibatalkan (uang kembali ke akun pembayar). |
+| **Pembelian** | Barang masuk dari supplier. Stok bertambah, **HPP rata-rata bergerak** dihitung ulang, diskon faktur dibebankan ke HPP. Dibayar **tunai** (mengurangi kas fisik pencatat) atau **non tunai** — Transfer, QRIS, Virtual Account, Kartu Debit (mengurangi rekening bank). Bisa dibatalkan (uang kembali ke akun pembayar). **Pembelian tempo** (hutang supplier, mis. 100 karton air mineral dibayar 3 hari kemudian): stok langsung bertambah, uang baru keluar saat dibayar — boleh **bertahap** (tunai/transfer/VA/QRIS/kartu, pilih rekening) dan ada uang muka opsional; pembayaran bisa dibatalkan selama tanggalnya belum di-closing. Daftar *Hutang supplier* per supplier, filter *Belum lunas / Lewat jatuh tempo*, dan kartu *Hutang pembelian* (jatuh tempo ≤ 3 hari) di dashboard. |
 | **Barang titipan (konsinyasi)** | Supplier menitipkan barang; toko membayar hanya yang terjual saat penyelesaian (harian atau beberapa hari sekali). Sisa bisa diretur atau terbawa, harga setor FIFO, bayar langsung atau belakangan (dicicil). |
 | **Penyesuaian & stok opname** | Stok masuk/keluar (rusak, hilang, bonus, dll.) dan opname (input stok fisik, selisih dicatat otomatis). |
 | **Kartu stok** | Mutasi per produk: saldo awal, masuk, keluar, saldo akhir, dan tautan ke dokumen sumber. |
@@ -175,6 +175,10 @@ Kasir tidak lagi mengisi diskon manual. Potongan hanya berasal dari menu **Disko
    - Nilai dihitung FIFO: kiriman terlama (dengan harga setornya) dianggap terjual lebih dulu.
 4. **Pembayaran**: langsung saat penyelesaian atau belakangan (dicicil) dari tab *Penyelesaian & Hutang*. Pembayaran **tunai**
    mengurangi *kas seharusnya* pada closing hari itu. Penyelesaian terakhir yang belum dibayar bisa dibatalkan (stok dikembalikan).
+   **Bayar sekaligus**: di tab *Per Supplier* tombol **Bayar** menampilkan semua penyelesaian penitip yang belum lunas
+   (mis. titip & retur setiap hari, dibayar 2–3 hari sekali) — centang yang dibayar, pilih metode (tunai / transfer /
+   QRIS / VA / kartu), lalu satu kali bayar melunasi semuanya; bukti bayar thermal berisi rincian per hari. Tetap tercatat
+   per penyelesaian, sehingga pembayaran bisa dibatalkan satu per satu dari detail penyelesaian.
 
 ## Penjualan kredit & tagihan bulanan
 
@@ -234,7 +238,7 @@ Tambah / Ubah / Hapus / Lainnya). Klik nama modul atau judul kolom untuk mencent
 | Kelompok | Contoh hak akses |
 | --- | --- |
 | Penjualan | Kasir (POS), bon, lihat semua penjualan, void; diskon & pelanggan (lihat / tambah / ubah / hapus) |
-| Inventory | Produk (lihat / tambah / ubah / hapus, **ubah harga jual**, import Excel), kategori, paket, supplier, pembelian (lihat sendiri / semua, catat, void), stok (kartu stok, penyesuaian, **opname** terpisah), barang titipan (terima, batalkan, penyelesaian, bayar) |
+| Inventory | Produk (lihat / tambah / ubah / hapus, **ubah harga jual**, import Excel), kategori, paket, supplier, pembelian (lihat sendiri / semua, catat, void, **bayar hutang**), stok (kartu stok, penyesuaian, **opname** terpisah), barang titipan (terima, batalkan, penyelesaian, bayar) |
 | Keuangan | Kas (lihat semua, kelola rekening, penyesuaian saldo), pengeluaran (lihat sendiri / semua, catat, ubah, hapus), tagihan (lihat, buat, hapus, terima & batalkan pembayaran), closing (lihat, closing, batalkan) |
 | Laporan | **Per jenis laporan** (12 laporan), **Export Excel / PDF** terpisah, **Lihat HPP & laba** (harga modal & laba di semua halaman) |
 | Administrasi | Pengguna (lihat / tambah / ubah / hapus, keamanan akun), role & hak akses, log aktivitas |

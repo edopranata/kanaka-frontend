@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import http, { errorMessage } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
-import { hariTanggal, jam, number, rupiah, tanggal } from '../utils/format'
+import { hariTanggal, jam, number, rupiah, tanggal, tanggalAngka } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SalesChart from '../components/SalesChart.vue'
@@ -107,6 +107,31 @@ onMounted(load)
       </template>
 
       <div class="mt-5 grid gap-5 lg:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]">
+        <section v-if="data.payables && data.payables.total" class="card">
+          <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 class="font-semibold">Hutang pembelian</h2>
+              <p class="text-xs text-slate-500">
+                Total <b class="tabular-nums text-slate-700">{{ rupiah(data.payables.total) }}</b>
+                <span v-if="data.payables.overdue" class="text-red-600"> · lewat jatuh tempo {{ rupiah(data.payables.overdue) }}</span>
+              </p>
+            </div>
+            <RouterLink :to="{ name: 'purchases', query: { payment: 'hutang' } }" class="shrink-0 text-sm font-medium text-brand-700 hover:underline">Lihat semua</RouterLink>
+          </div>
+          <ul v-if="data.payables.due_soon.length" class="divide-y divide-slate-100">
+            <li v-for="item in data.payables.due_soon" :key="item.id">
+              <RouterLink :to="{ name: 'purchase', params: { id: item.id } }" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm hover:bg-slate-50">
+                <span class="min-w-0">
+                  <span class="block truncate font-medium">{{ item.supplier || '-' }}</span>
+                  <span class="text-xs" :class="item.is_overdue ? 'font-medium text-red-600' : 'text-slate-500'">{{ item.number }} · jatuh tempo {{ tanggalAngka(item.due_date) }}<template v-if="item.is_overdue"> (lewat)</template></span>
+                </span>
+                <span class="shrink-0 font-semibold tabular-nums">{{ rupiah(item.remaining) }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+          <p v-else class="px-5 py-4 text-sm text-slate-500">Tidak ada hutang yang jatuh tempo dalam 3 hari.</p>
+        </section>
+
         <section v-if="data.low_stock" class="card">
           <header class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <div>

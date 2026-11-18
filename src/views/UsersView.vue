@@ -44,7 +44,7 @@ async function load() {
 function openForm(user = null) {
   errors.value = {}
   const kasir = assignable().find((role) => role.slug === 'kasir') || assignable().at(-1)
-  form.value = user ? { ...user } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true, cash_account_id: null }
+  form.value = user ? { ...user, move_balance: false } : { id: null, name: '', username: '', email: '', role_id: kasir?.id ?? null, is_active: true, cash_account_id: null, move_balance: false }
 }
 
 const formatDate = (value) => new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
@@ -65,8 +65,9 @@ function mailResult(data) {
 async function save() {
   saving.value = true
   errors.value = {}
-  const { id, name, username, email, role_id, is_active, cash_account_id } = form.value
-  const payload = { name, username, email, role_id, is_active, cash_account_id: cash_account_id || null }
+  const { id, name, username, email, role_id, is_active, cash_account_id, move_balance } = form.value
+  // move_balance: pindahkan saldo kas pribadi ke laci bersama yang baru ditetapkan (diminta server bila masih bersaldo).
+  const payload = { name, username, email, role_id, is_active, cash_account_id: cash_account_id || null, move_balance: Boolean(move_balance) }
   try {
     if (id) {
       await http.put(`/users/${id}`, payload)
@@ -247,6 +248,13 @@ onMounted(() => load().catch((e) => toast.error(errorMessage(e))))
           />
           <p v-if="errors.cash_account_id" class="error-text">{{ errors.cash_account_id }}</p>
           <p v-else class="mt-1 text-xs text-slate-500">Laci bersama: uang tunai kasir ini masuk ke laci yang sama dengan kasir lain; closing sekali hitung.</p>
+          <div v-if="errors.move_balance" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <p>{{ errors.move_balance }}</p>
+            <label class="mt-2 flex items-start gap-2 text-sm font-medium">
+              <input v-model="form.move_balance" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-300" />
+              Pindahkan saldo sekarang (tercatat sebagai serah terima KAS-…)
+            </label>
+          </div>
         </div>
         <p v-if="!form.id" class="flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800 sm:col-span-2">
           <AppIcon name="inbox" :size="16" class="mt-px shrink-0" />

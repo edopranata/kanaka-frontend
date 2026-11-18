@@ -152,6 +152,8 @@ Menjalankan ulang aman: produk yang sudah ada (barcode / kode sama) dilewati.
   yang tersedia (mis. Indomie stok 40 → tersedia 40 porsi). **Bahan opsional** (mis. telur) boleh dihilangkan pemesan
   dengan potongan harga yang Anda tentukan, dan tidak membatasi ketersediaan.
 - Form paket menampilkan nilai bahan (harga eceran), **jasa/olahan** (= harga paket − nilai bahan), HPP bahan, dan laba.
+  HPP paket tersimpan diperbarui otomatis setiap HPP bahan berubah (pembelian, titipan, ubah produk); laba penjualan paket
+  selalu dihitung dari HPP bahan saat terjual.
 - Saat terjual (kasir maupun bon), stok bahan yang dipakai berkurang dan tercatat di kartu stok bahan ("Paket …").
   Void mengembalikan stok bahan sesuai yang benar-benar terpakai. Struk mencetak varian, mis. "(tanpa Telur Ayam)".
 - Paket tidak memiliki stok sendiri: tidak bisa dibeli dari supplier, di-opname, atau menjadi bahan paket lain.
@@ -218,7 +220,7 @@ Menu **Kas & Bank** memisahkan uang per akun:
 | Akun | Isi |
 | --- | --- |
 | **Kas fisik** (satu per pengguna, dibuat otomatis) | Penjualan & pelunasan piutang **tunai** yang dicatat pengguna itu, pembelian, pengeluaran & bayar titipan tunai yang ia bayar, serta perpindahan kas. |
-| **Laci bersama** (opsional, dibuat pemilik/admin) | Satu laci uang dipakai beberapa kasir: di *Kas & Bank → + Laci bersama* buat lacinya (mis. "Laci Depan"), lalu di *Pengguna* pilih **Laci kas** untuk kasir yang memakainya. Semua transaksi tunai mereka masuk ke laci itu (pencatat tetap tercatat per transaksi), anggota mana pun boleh menyerahkan/menerima kasnya, dan closing cukup **sekali hitung**. Default tetap 1 kasir 1 laci; saldo lama di laci pribadi tetap tercatat sampai diserahkan. Laci hanya bisa dinonaktifkan bila saldonya 0 (anggota kembali ke laci pribadi). |
+| **Laci bersama** (opsional, dibuat pemilik/admin) | Satu laci uang dipakai beberapa kasir: di *Kas & Bank → + Laci bersama* buat lacinya (mis. "Laci Depan"), lalu di *Pengguna* pilih **Laci kas** untuk kasir yang memakainya. Semua transaksi tunai mereka masuk ke laci itu (pencatat tetap tercatat per transaksi), anggota mana pun boleh menyerahkan/menerima kasnya, dan closing cukup **sekali hitung**. Default tetap 1 kasir 1 laci. Saat kasir ditetapkan ke laci bersama dan kas pribadinya masih bersaldo (plus atau minus), simpan ditolak sampai dicentang **Pindahkan saldo** (tercatat sebagai serah terima `KAS-…` yang langsung selesai); ditolak juga bila masih ada serah terima kas pribadinya yang menunggu konfirmasi. Laci hanya bisa dinonaktifkan bila saldonya 0 (anggota kembali ke laci pribadi). |
 | **Rekening bank** (dikelola pemilik/admin) | Transaksi **Transfer, QRIS, Kartu, Virtual Account** (VA hanya untuk pembayaran keluar/pelunasan, tidak di kasir). Rekening tujuan per metode diatur di *Pengaturan → Closing, Kas & Tagihan*; pengeluaran/pembayaran non tunai bisa memilih rekening. |
 
 Perpindahan kas (nomor `KAS-…`, prefix bisa diubah):

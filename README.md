@@ -37,7 +37,7 @@ kanaka/
 | **Closing harian** | Manual (hitung kas fisik **per pengguna**, bisa per pecahan uang, selisih per kas) dan **otomatis setiap 24:00**. |
 | **Laporan** | Penjualan harian, per produk, per kategori, per kasir, metode bayar, diskon & promo, rekap closing, laba rugi, pengeluaran, persediaan & nilai stok, pembelian. Semua bisa dicetak & **export Excel**. |
 | **Dashboard** | Penjualan & laba hari ini/bulan ini, grafik 14 hari, produk terlaris, stok menipis, status closing. |
-| **Administrasi** | Pengguna & level akses, log aktivitas (login, void, closing, perubahan harga, dll.), pengaturan aplikasi (khusus pemilik). |
+| **Administrasi** | Pengguna & level akses, log aktivitas (login, void, closing, perubahan harga, dll.), **Log Error** (error server & perangkat pengguna, ringkasan email harian), pengaturan aplikasi (khusus pemilik). |
 
 ## Printer struk (thermal / Bluetooth)
 
@@ -252,7 +252,7 @@ Tambah / Ubah / Hapus / Lainnya). Klik nama modul atau judul kolom untuk mencent
 | Inventory | Produk (lihat / tambah / ubah / hapus, **ubah harga jual**, import Excel), kategori, paket, supplier, pembelian (lihat sendiri / semua, catat, void, **bayar hutang**), stok (kartu stok, penyesuaian, **opname** terpisah), barang titipan (terima, batalkan, penyelesaian, bayar) |
 | Keuangan | Kas (lihat semua, kelola rekening, penyesuaian saldo), pengeluaran (lihat sendiri / semua, catat, ubah, hapus), tagihan (lihat, buat, hapus, terima & batalkan pembayaran), closing (lihat, closing, batalkan) |
 | Laporan | **Per jenis laporan** (12 laporan), **Export Excel / PDF** terpisah, **Lihat HPP & laba** (harga modal & laba di semua halaman) |
-| Administrasi | Pengguna (lihat / tambah / ubah / hapus, keamanan akun), role & hak akses, log aktivitas |
+| Administrasi | Pengguna (lihat / tambah / ubah / hapus, keamanan akun), role & hak akses, log aktivitas & Log Error |
 | Pengaturan | **Per tab**: Aplikasi, Toko & Struk, Penomoran, Transaksi & Stok, Closing/Kas/Tagihan, Keamanan & Email, Pemeliharaan. Menu *Pengaturan* hanya tampil bagi yang punya minimal satu tab; printer struk ada di halaman terpisah untuk semua pengguna |
 
 Aturan penting:
@@ -325,6 +325,21 @@ GOOGLE_CLIENT_ID=
 
 Setelah mengubah `.env`, jalankan `php artisan config:clear`, lalu buka **Pengaturan → Keamanan & Email → Kirim
 email uji**. Email dikirim langsung, tanpa antrean, karena shared hosting tidak menjalankan queue worker.
+
+## Log Error (pemantauan error)
+
+- **Server**: setiap exception yang dilaporkan Laravel (HTTP 500 — bukan validasi/401/403/404) dicatat ke tabel
+  `error_logs` lewat `bootstrap/app.php` (selain file log biasa). Pencatat tidak pernah memicu error baru.
+- **Browser** (`src/utils/errorReporter.js` → `POST /api/v1/client-errors`, perlu login, throttle 30/menit): error
+  halaman, promise tanpa `catch`, error komponen Vue, **server tidak merespons (timeout)** dan **koneksi putus** pada
+  request API, serta gagal memuat versi baru. Error yang sama dikirim paling banyak sekali per menit (maks 20 per sesi);
+  saat offline laporan disimpan di perangkat dan dikirim ketika online lagi.
+- Error yang sama dikelompokkan (angka dalam pesan diabaikan) dengan hitungan kemunculan sampai **ditandai selesai**;
+  muncul lagi sesudahnya = baris baru.
+- Halaman **Administrasi → Log Error** dan banner di dashboard untuk hak akses *Log aktivitas*.
+- Ringkasan email `errors:digest` setiap hari **17.30 WIB** ke pengguna aktif ber-email dengan hak *Log aktivitas*,
+  hanya bila ada error baru / berulang.
+- Pembersihan harian: yang sudah selesai dihapus sesuai masa simpan log; yang tidak muncul lagi > 90 hari ikut dihapus.
 
 ## Aturan closing harian
 

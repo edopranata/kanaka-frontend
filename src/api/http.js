@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useLoadingStore } from '../stores/loading'
+import { reportError } from '../utils/errorReporter'
 
 export const TOKEN_KEY = 'penjualan.token'
 
@@ -25,6 +26,18 @@ http.interceptors.response.use(
   },
   (error) => {
     useLoadingStore().done()
+    // Tanpa response = server tidak merespons / koneksi putus: tidak tercatat di server, jadi dilaporkan dari browser.
+    if (!error.response && error.config && error.code !== 'ERR_CANCELED') {
+      const timeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+      if (timeout || navigator.onLine) {
+        reportError({
+          kind: timeout ? 'timeout' : 'network',
+          message: timeout ? `Server tidak merespons dalam ${Math.round((error.config.timeout || 0) / 1000)} detik` : `Tidak dapat terhubung ke server (${error.message})`,
+          location: `${(error.config.method || 'get').toUpperCase()} ${error.config.url}`,
+          method: error.config.method,
+        })
+      }
+    }
     if (error.response?.status === 401 && !error.config.url.endsWith('/auth/login')) {
       localStorage.removeItem(TOKEN_KEY)
       if (!location.pathname.startsWith('/login')) {

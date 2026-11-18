@@ -2,6 +2,7 @@
 import { nextTick, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMetaStore } from '../stores/meta'
+import { number, percent } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 
 /**
@@ -20,6 +21,7 @@ const sections = [
   { id: 'penyelesaian', title: 'Sore: penyelesaian titipan', icon: 'clipboard' },
   { id: 'bayar-titipan', title: 'Bayar penitip', icon: 'handover' },
   { id: 'pembelian', title: 'Pembelian barang', icon: 'truck' },
+  { id: 'harga', title: 'Harga jual & margin', icon: 'tag' },
   { id: 'kas', title: 'Kas, setor & pengeluaran', icon: 'cash' },
   { id: 'closing', title: 'Tutup hari: closing', icon: 'lock' },
   { id: 'masalah', title: 'Bila ada masalah', icon: 'alert' },
@@ -128,11 +130,22 @@ onMounted(async () => {
           <li><b>Lunas sekarang</b> (pilih metode bayar) atau <b>Tempo (bayar nanti)</b> + tanggal jatuh tempo (mis. dropship air mineral dibayar 3 hari kemudian).</li>
           <li>Membayar tempo: <b>Pembelian</b> → tab <b>Belum lunas</b> → buka pembelian → <b>Bayar Hutang</b>.</li>
         </ol>
-        <p class="hint">Hutang yang jatuh tempo ≤ 3 hari tampil di Dashboard.</p>
+        <p class="hint">Hutang yang jatuh tempo ≤ 3 hari tampil di Dashboard. Bila muncul <i>Harga beli jauh berbeda dari HPP</i>, cek isi satuan (mis. 1 DUS = 144 PCS, bukan 114).</p>
+      </section>
+
+      <section id="harga" class="card scroll-mt-20">
+        <h2><span>8</span> Harga jual &amp; margin</h2>
+        <ul>
+          <li>Harga jual minimal = <b>HPP + margin {{ percent(meta.min_margin_percent ?? 7.5) }}</b> (dari HPP; contoh HPP Rp 10.000 → minimal Rp {{ number(Math.ceil(10000 * (1 + (meta.min_margin_percent ?? 7.5) / 100))) }}).</li>
+          <li><b class="text-red-700">Di bawah HPP</b> (rugi) → <b>ditolak</b>. <b class="text-amber-700">Di bawah margin</b> → boleh, tetapi wajib dicentang (mis. harga promo).</li>
+          <li><b>Pembelian / Titipan Masuk</b> yang menaikkan HPP: harga jual yang jadi rugi langsung diisi <i>harga saran</i> di dialog — periksa, lalu simpan (harga baru langsung berlaku di kasir).</li>
+          <li>Cek rutin: kartu <b>Harga di bawah margin</b> di Dashboard atau filter harga di <b>Produk</b>.</li>
+        </ul>
+        <p class="hint">Tidak punya hak ubah harga jual? Minta pemilik/admin menaikkan harga dulu.</p>
       </section>
 
       <section id="kas" class="card scroll-mt-20">
-        <h2><span>8</span> Kas, setor &amp; pengeluaran</h2>
+        <h2><span>9</span> Kas, setor &amp; pengeluaran</h2>
         <ul>
           <li>Uang tunai masuk ke laci kasir (laci bersama bila diatur pemilik, mis. <i>Laci Depan</i>). Saldo: <b>Keuangan → Kas &amp; Bank</b>.</li>
           <li>Setor ke rekening: <b>Kas &amp; Bank → Setor ke Bank</b>.</li>
@@ -142,7 +155,7 @@ onMounted(async () => {
       </section>
 
       <section id="closing" class="card scroll-mt-20">
-        <h2><span>9</span> Tutup hari: closing</h2>
+        <h2><span>10</span> Tutup hari: closing</h2>
         <ol>
           <li>Pastikan penyelesaian titipan &amp; pengeluaran hari ini sudah dicatat.</li>
           <li><b>Keuangan → Closing Harian → Closing Manual</b>.</li>
@@ -153,13 +166,14 @@ onMounted(async () => {
       </section>
 
       <section id="masalah" class="card scroll-mt-20">
-        <h2><span>10</span> Bila ada masalah</h2>
+        <h2><span>11</span> Bila ada masalah</h2>
         <ul>
           <li><b>Layar macet / koneksi putus saat bayar</b>: tekan tombol bayar lagi — <b>aman</b>, transaksi tidak tercatat dua kali. Jangan input ulang dari awal.</li>
           <li><b>Salah transaksi</b>: minta pemilik/admin membatalkan di <b>Riwayat Penjualan</b> (wajib alasan), lalu buat transaksi baru.</li>
           <li><b>Printer tidak mencetak</b>: menu nama Anda → <b>Printer struk</b> → <i>Hubungkan printer</i>; sementara cetak lewat dialog browser.</li>
           <li><b>“Terlalu banyak percobaan”</b>: tunggu 1 menit lalu coba lagi.</li>
           <li><b>Internet mati</b>: catat sementara di buku, input ke aplikasi setelah tersambung.</li>
+          <li>Error &amp; server yang tidak merespons <b>tercatat otomatis</b> di <i>Log Error</i> dan dilaporkan ke pemilik — tetap kabari bila berulang.</li>
         </ul>
       </section>
     </div>

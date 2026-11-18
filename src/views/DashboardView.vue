@@ -50,6 +50,15 @@ onMounted(load)
       </RouterLink>
 
       <RouterLink
+        v-if="data.errors?.open"
+        :to="{ name: 'error-logs' }"
+        class="mb-5 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 transition hover:bg-red-100"
+      >
+        <AppIcon name="alert" class="shrink-0" />
+        <span><b>{{ data.errors.open }} error</b> belum ditangani di Log Error. Cek detailnya lalu tandai selesai.</span>
+      </RouterLink>
+
+      <RouterLink
         v-if="data.receivables && (data.receivables.billed || data.receivables.unbilled)"
         :to="{ name: 'bills' }"
         class="card card-hover mb-5 flex flex-wrap items-center gap-x-8 gap-y-2 px-5 py-4 text-sm"

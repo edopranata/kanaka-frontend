@@ -49,6 +49,7 @@ export const MENU = [
       { name: 'users', label: 'Pengguna', icon: 'user', match: ['users'] },
       { name: 'roles', label: 'Role & Hak Akses', icon: 'shield', match: ['roles'] },
       { name: 'logs', label: 'Log Aktivitas', icon: 'clipboard', match: ['logs'] },
+      { name: 'error-logs', label: 'Log Error', icon: 'alert', match: ['error-logs'] },
       { name: 'settings', label: 'Pengaturan', icon: 'cog', match: ['settings'] },
     ],
   },

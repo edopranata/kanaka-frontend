@@ -176,6 +176,7 @@ const GUIDE_SECTIONS = {
   pos: 'kasir', sales: 'masalah', sale: 'masalah', 'credit-sales': 'bon', 'credit-sale-create': 'bon', bills: 'bon', bill: 'bon',
   consignments: 'bayar-titipan', 'consignment-receive': 'titipan-masuk', 'consignment-receipt': 'titipan-masuk', 'consignment-settle': 'penyelesaian', 'consignment-settlement': 'bayar-titipan',
   purchases: 'pembelian', purchase: 'pembelian', 'purchase-create': 'pembelian', cash: 'kas', expenses: 'kas', closings: 'closing', closing: 'closing', printer: 'masalah',
+  products: 'harga', packages: 'harga', 'error-logs': 'masalah',
 }
 const guideAnchor = computed(() => (GUIDE_SECTIONS[route.name] ? `#${GUIDE_SECTIONS[route.name]}` : ''))
 </script>

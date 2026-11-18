@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import AppLayout from '../layouts/AppLayout.vue'
+import { reportError } from '../utils/errorReporter'
 
 const view = (name) => () => import(`../views/${name}.vue`)
 
@@ -93,6 +94,7 @@ const routes = [
       { path: 'role', name: 'roles', component: view('RolesView'), meta: { title: 'Role & Hak Akses', permission: 'roles.manage' } },
       { path: 'pengguna', name: 'users', component: view('UsersView'), meta: { title: 'Pengguna', permission: 'users.view' } },
       { path: 'log-aktivitas', name: 'logs', component: view('ActivityLogsView'), meta: { title: 'Log Aktivitas', permission: 'logs.view' } },
+      { path: 'log-error', name: 'error-logs', component: view('ErrorLogsView'), meta: { title: 'Log Error', permission: 'logs.view' } },
       { path: 'pengaturan', name: 'settings', component: view('SettingsView'), meta: { title: 'Pengaturan', permission: SETTINGS_PERMISSIONS } },
       // Printer struk per perangkat (tersimpan di browser) — untuk semua pengguna.
       { path: 'printer', name: 'printer', component: view('PrinterView'), meta: { title: 'Printer Struk' } },
@@ -140,7 +142,11 @@ router.beforeEach(async (to) => {
 router.onError((error, to) => {
   if (!/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(error?.message || '')) return
   try {
-    if (Date.now() - Number(sessionStorage.getItem('chunk-reload') || 0) < 10000) return
+    // Sudah dicoba muat ulang tetapi tetap gagal → laporkan (biasanya cache / service worker bermasalah).
+    if (Date.now() - Number(sessionStorage.getItem('chunk-reload') || 0) < 10000) {
+      reportError({ kind: 'chunk', message: error.message, location: to.fullPath })
+      return
+    }
     sessionStorage.setItem('chunk-reload', String(Date.now()))
   } catch {
     // tanpa penyimpanan sesi: tetap coba muat ulang

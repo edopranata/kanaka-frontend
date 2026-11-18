@@ -4,7 +4,7 @@ import http, { errorMessage, validationErrors } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useMetaStore } from '../stores/meta'
 import { useToastStore } from '../stores/toast'
-import { number, rupiah } from '../utils/format'
+import { number, percent, rupiah } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import AppModal from '../components/AppModal.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -14,6 +14,8 @@ import ProductSearch from '../components/ProductSearch.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import AppSelect from '../components/AppSelect.vue'
 import { confirmDialog } from '../stores/confirm'
+import NumberInput from '../components/NumberInput.vue'
+import { checkUnits, marginOf, marginPercent } from '../utils/priceGuard'
 
 const auth = useAuthStore()
 const toast = useToastStore()
@@ -83,9 +85,11 @@ function openForm(pkg = null) {
         unit: pkg.unit,
         sell_price: pkg.sell_price || 0,
         is_active: pkg.is_active,
+        min_margin_percent: pkg.min_margin_percent ?? null,
+        confirm_low_margin: false,
         components: pkg.components.map((item) => ({ ...item })),
       }
-    : { id: null, name: '', sku: '', category_id: '', unit: meta.defaults.package_unit, sell_price: 0, is_active: true, components: [] }
+    : { id: null, name: '', sku: '', category_id: '', unit: meta.defaults.package_unit, sell_price: 0, is_active: true, min_margin_percent: null, confirm_low_margin: false, components: [] }
   if (!pkg) {
     nextSku.value = ''
     http.get('/products/next-sku', { params: { type: 'paket' } }).then(({ data }) => (nextSku.value = data.sku)).catch(() => {})
@@ -115,6 +119,8 @@ function addComponent(product) {
 const formCalc = computed(() => (form.value ? calc(form.value) : null))
 const optionalTotal = computed(() => form.value?.components.filter((item) => item.is_optional).reduce((sum, item) => sum + (item.omit_price || 0), 0) || 0)
 const componentError = (index, field) => errors.value[`components.${index}.${field}`]
+// Pengaman harga: HPP paket = total HPP bahan; di bawah HPP ditolak, di bawah margin minimum wajib dikonfirmasi.
+const priceCheck = computed(() => (form.value && can.cost ? checkUnits([{ conversion: 1, sell_price: form.value.sell_price }], formCalc.value.cost, marginOf(form.value, meta))[0] : null))
 
 async function save() {
   saving.value = true
@@ -122,6 +128,7 @@ async function save() {
   const payload = {
     ...form.value,
     category_id: form.value.category_id || null,
+    min_margin_percent: form.value.min_margin_percent === '' ? null : form.value.min_margin_percent,
     components: form.value.components.map(({ component_id, qty, is_optional, omit_price }) => ({ component_id, qty, is_optional, omit_price: is_optional ? omit_price : 0 })),
   }
   try {
@@ -253,7 +260,17 @@ onMounted(() => {
               <label class="label">Harga jual per {{ form.unit || 'porsi' }}</label>
               <MoneyInput v-model="form.sell_price" :invalid="!!errors.sell_price" :disabled="priceLocked" />
               <p v-if="errors.sell_price" class="error-text">{{ errors.sell_price }}</p>
-              <p v-else-if="priceLocked" class="mt-1 flex items-center gap-1 text-xs text-slate-500"><AppIcon name="lock" :size="12" /> Harga dikunci (butuh hak akses Ubah harga jual).</p>
+              <p v-else-if="priceCheck && form.sell_price > 0 && formCalc.cost > 0" class="mt-1 text-xs" :class="{ 'text-red-600': priceCheck.level === 'rugi', 'text-amber-700': priceCheck.level === 'margin', 'text-emerald-700': !priceCheck.level }">
+                <template v-if="priceCheck.level === 'rugi'">Di bawah HPP bahan {{ rupiah(priceCheck.cost) }} — minimal {{ rupiah(priceCheck.min) }}</template>
+                <template v-else-if="priceCheck.level === 'margin'">Margin {{ percent(marginPercent(form.sell_price, priceCheck.cost)) }} di bawah minimum — minimal {{ rupiah(priceCheck.min) }}</template>
+                <template v-else>Margin {{ percent(marginPercent(form.sell_price, priceCheck.cost)) }} dari HPP</template>
+                <button v-if="priceCheck.level && !priceLocked" type="button" class="ml-1 underline" @click="form.sell_price = priceCheck.suggested">pakai {{ rupiah(priceCheck.suggested, false) }}</button>
+              </p>
+              <label v-if="(priceCheck?.level === 'margin' && !priceLocked) || errors.confirm_low_margin" class="mt-2 flex items-start gap-2 text-xs text-amber-900">
+                <input v-model="form.confirm_low_margin" type="checkbox" class="mt-0.5" /> Tetap simpan di bawah margin minimum {{ percent(marginOf(form, meta)) }}
+              </label>
+              <p v-if="errors.confirm_low_margin" class="error-text">{{ errors.confirm_low_margin }}</p>
+              <p v-if="priceLocked" class="mt-1 flex items-center gap-1 text-xs text-slate-500"><AppIcon name="lock" :size="12" /> Harga dikunci (butuh hak akses Ubah harga jual).</p>
             </div>
           </div>
 
@@ -299,6 +316,12 @@ onMounted(() => {
               </div>
             </TransitionGroup>
             <p v-if="!form.components.length" class="px-4 py-6 text-center text-sm text-slate-500">Belum ada bahan.</p>
+          </div>
+
+          <div v-if="can.cost && !priceLocked" class="max-w-xs">
+            <label class="label" for="package-min-margin">Margin minimum khusus <span class="font-normal text-slate-400">(opsional)</span></label>
+            <NumberInput id="package-min-margin" v-model="form.min_margin_percent" :min="0" :max="100" :step="0.5" suffix="%" :placeholder="`Ikut pengaturan: ${percent(meta.min_margin_percent)}`" :invalid="!!errors.min_margin_percent" />
+            <p v-if="errors.min_margin_percent" class="error-text">{{ errors.min_margin_percent }}</p>
           </div>
 
           <label class="flex items-center gap-2 text-sm">

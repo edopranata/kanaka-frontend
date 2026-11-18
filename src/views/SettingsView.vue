@@ -14,7 +14,7 @@ import NumberInput from '../components/NumberInput.vue'
 import ReceiptPreview from '../components/ReceiptPreview.vue'
 import InvoicePreview from '../components/InvoicePreview.vue'
 import { RECEIPT_TEMPLATES, columnsFor, headerLines, receiptBytes, sampleSale } from '../utils/escpos'
-import { taxLabel } from '../utils/format'
+import { number, taxLabel } from '../utils/format'
 import { printerConfig } from '../utils/printer'
 
 const auth = useAuthStore()
@@ -653,6 +653,15 @@ onMounted(async () => {
                 </p>
               </div>
 
+              <div>
+                <label class="label" for="min-margin">Margin minimum harga jual</label>
+                <NumberInput id="min-margin" v-model="form.min_margin_percent" :min="0" :max="100" :step="0.1" suffix="%" :invalid="!!errors.min_margin_percent" />
+                <p v-if="errors.min_margin_percent" class="error-text">{{ errors.min_margin_percent }}</p>
+                <p class="mt-1 text-xs text-slate-500">
+                  Dihitung dari HPP. Contoh HPP Rp 10.000 → minimal Rp {{ number(Math.ceil(10000 * (1 + (Number(form.min_margin_percent) || 0) / 100))) }}. Harga di bawah HPP <b>ditolak</b>; di bawah margin ini wajib dikonfirmasi.
+                  Bisa diganti per produk.
+                </p>
+              </div>
               <div>
                 <label class="label">Satuan bawaan produk baru</label>
                 <input v-model="form.default_unit" class="input uppercase" @input="form.default_unit = form.default_unit.toUpperCase()" />

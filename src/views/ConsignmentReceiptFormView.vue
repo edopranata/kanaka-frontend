@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
+import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { number, rupiah, supplierLabel, today } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
@@ -10,9 +11,14 @@ import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import AppSelect from '../components/AppSelect.vue'
 import DateInput from '../components/DateInput.vue'
+import PriceReview from '../components/PriceReview.vue'
+import { useMetaStore } from '../stores/meta'
+import { averageCost, marginOf, reviewPrices } from '../utils/priceGuard'
 
 const router = useRouter()
 const toast = useToastStore()
+const canPrice = useAuthStore().can('products.price')
+const meta = useMetaStore()
 
 const suppliers = ref([])
 const form = reactive({ supplier_id: '', date: today(), notes: '', items: [] })
@@ -43,11 +49,35 @@ function addProduct(product) {
     consignor: product.consignor,
     qty: 1,
     cost: Math.round(product.cost_price || 0),
+    exact_cost: Number(product.cost_price) || 0,
+    margin: marginOf(product, meta),
+    sell_units: product.units || [],
   })
 }
 
 const total = computed(() => form.items.reduce((sum, item) => sum + (Number(item.qty) || 0) * item.cost, 0))
 const itemError = (index, field) => errors.value[`items.${index}.${field}`]
+
+// Harga setor = HPP: harga jual di bawah HPP ditolak, di bawah margin minimum wajib konfirmasi.
+const prices = reactive({})
+const confirmLow = ref(false)
+const review = computed(() =>
+  reviewPrices(
+    form.items
+      .filter((item) => item.cost > 0 && Number(item.qty) > 0)
+      .map((item) => ({
+        product_id: item.product_id,
+        name: item.name,
+        base_unit: item.unit,
+        old_cost: item.exact_cost,
+        new_cost: averageCost(item.stock, item.exact_cost, Number(item.qty), item.cost),
+        margin: item.margin,
+        units: item.sell_units,
+      })),
+    prices,
+  ),
+)
+const priceBlocked = computed(() => review.value.loss > 0 || (review.value.low > 0 && !confirmLow.value))
 
 async function save() {
   saving.value = true
@@ -56,6 +86,8 @@ async function save() {
     const { data } = await http.post('/consignments/receipts', {
       ...form,
       items: form.items.map(({ product_id, qty, cost }) => ({ product_id, qty, cost })),
+      prices: canPrice ? review.value.payload : undefined,
+      confirm_low_margin: confirmLow.value,
     })
     toast.success(`Titipan ${data.data.number} dicatat. Stok bertambah.`)
     router.replace({ name: 'consignment-receipt', params: { id: data.data.id } })
@@ -127,11 +159,12 @@ onMounted(async () => {
             </tbody>
           </table>
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4">
+        <PriceReview v-model:confirmed="confirmLow" :review="review" :prices="prices" :errors="errors" :editable="canPrice" class="mx-4 mt-4" />
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4" :class="{ 'mt-4': review.rows.length }">
           <p class="text-sm text-slate-600">Nilai setor: <b class="text-lg text-slate-900 tabular-nums">{{ rupiah(total) }}</b></p>
           <div class="flex gap-2">
             <RouterLink :to="{ name: 'consignments' }" class="btn-secondary">Batal</RouterLink>
-            <button class="btn-primary" :disabled="saving || !form.items.length || !form.supplier_id" @click="save">{{ saving ? 'Menyimpan…' : 'Simpan Titipan' }}</button>
+            <button class="btn-primary" :disabled="saving || !form.items.length || !form.supplier_id || priceBlocked" @click="save">{{ saving ? 'Menyimpan…' : 'Simpan Titipan' }}</button>
           </div>
         </div>
       </section>

@@ -70,6 +70,16 @@ Windows (contoh Rongta RPP02N): nyalakan printer → **Settings → Bluetooth & 
   350 GRM); opname boleh campuran (mis. 32 BKS + 120 GRM). Bila jumlah dalam satuan dasar kurang dari satu satuan besar
   yang isinya ≥ 50 (mis. "33 GRM"), muncul peringatan "Maksud Anda 33 BKS?".
 - HPP bisa diisi per satuan besar (mis. Rp 50.000 per BKS → Rp 142,86 per GRM); HPP disimpan per satuan dasar dengan 2 desimal.
+- **Pengaman harga jual (margin minimum)**: harga minimum satuan = HPP per satuan dasar × isi × (1 + margin minimum).
+  Margin dihitung **dari HPP**, bawaan **7,5%** (*Pengaturan → Transaksi & stok*), bisa diganti per produk / paket
+  (kosong = ikut pengaturan). Harga **di bawah HPP ditolak**; di bawah margin minimum **wajib dikonfirmasi** (centang).
+  Diperiksa saat simpan produk & paket (hanya bila harga/HPP/margin berubah), saat **Pembelian** dan **Titipan Masuk**
+  (HPP baru dihitung dulu; harga jual yang terlewati bisa langsung dinaikkan di dialog konfirmasi — satuan yang rugi
+  otomatis diisi harga saran, dibulatkan ke Rp 100; tercatat di Log Aktivitas). Dialog pembelian juga memperingatkan
+  harga beli per satuan dasar yang beda > 30% dari HPP lama (biasanya salah isi satuan, mis. 1 DUS = 114 padahal 144).
+  Pengguna tanpa hak *Ubah harga jual* tidak bisa menyimpan pembelian yang membuat harga di bawah HPP — harga dinaikkan
+  pemilik/admin dulu. Daftar produk punya filter *Di bawah margin minimum / Di bawah HPP*, dashboard menampilkan kartu
+  *Harga di bawah margin* (hak *Lihat HPP & laba*).
 - **Koreksi stok awal**: selama stok awal masih satu-satunya mutasi produk (belum ada jual, beli, penyesuaian, titipan),
   jumlahnya bisa diperbaiki di form ubah produk oleh pengguna dengan hak *Stok opname* (tercatat di Log Aktivitas).
   Setelah ada transaksi, gunakan Stok Opname.
@@ -90,7 +100,7 @@ Windows (contoh Rongta RPP02N): nyalakan printer → **Settings → Bluetooth & 
 
 Menu *Pengaturan Aplikasi* (setiap tab diatur hak aksesnya sendiri, lihat bagian Role & hak akses): nama & slogan aplikasi (tampil di halaman masuk), identitas toko & struk (kertas 58/80 mm, tampilan cetak Standar / Ringkas / Detail, keterangan "BON - BAYAR NANTI" bisa disembunyikan, pratinjau struk utuh), nota tagihan A4 (judul, header, catatan kaki mis. rekening transfer, tanda tangan, dengan pratinjau),
 prefix setiap dokumen (nota `INV`, bon `BON`, pembelian `PB`, penyesuaian `ADJ`, opname `SO`, tagihan `TG`), periode
-pengulangan nomor urut (harian/bulanan/tahunan) & jumlah digit, prefix SKU, pajak (nama & tarif, mis. "PPN 11%"; tarif tersimpan per transaksi), rekening default per metode non tunai, satuan & stok minimum
+pengulangan nomor urut (harian/bulanan/tahunan) & jumlah digit, prefix SKU, pajak (nama & tarif, mis. "PPN 11%"; tarif tersimpan per transaksi), rekening default per metode non tunai, margin minimum harga jual (bawaan 7,5% dari HPP), satuan & stok minimum
 bawaan, stok minus, closing otomatis, serta tagihan otomatis & jatuh tempo.
 
 ## Import master produk dari Excel

@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import http, { errorMessage } from '../api/http'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
-import { hariTanggal, jam, number, rupiah, tanggal, tanggalAngka } from '../utils/format'
+import { hariTanggal, jam, number, percent, rupiah, tanggal, tanggalAngka } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SalesChart from '../components/SalesChart.vue'
@@ -130,6 +130,31 @@ onMounted(load)
             </li>
           </ul>
           <p v-else class="px-5 py-4 text-sm text-slate-500">Tidak ada hutang yang jatuh tempo dalam 3 hari.</p>
+        </section>
+
+        <section v-if="data.price_issues && data.price_issues.count" class="card">
+          <header class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 class="font-semibold text-slate-900">Harga di bawah margin</h2>
+              <p class="text-xs text-slate-500">
+                {{ data.price_issues.count }} produk di bawah margin minimum {{ percent(data.price_issues.margin) }}
+                <span v-if="data.price_issues.loss" class="font-medium text-red-600"> · {{ data.price_issues.loss }} di bawah HPP (rugi)</span>
+              </p>
+            </div>
+            <RouterLink :to="{ name: 'products', query: { price: data.price_issues.loss ? 'rugi' : 'margin', active: '' } }" class="shrink-0 text-sm font-medium text-brand-700 hover:underline">Lihat semua</RouterLink>
+          </header>
+          <ul class="divide-y divide-slate-100">
+            <li v-for="item in data.price_issues.items" :key="`${item.product_id}-${item.unit}`" class="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+              <span class="min-w-0">
+                <span class="block truncate font-medium">{{ item.product }}</span>
+                <span class="text-xs text-slate-500">per {{ item.unit }} · HPP {{ rupiah(item.cost, false) }} · minimal {{ rupiah(item.min_price, false) }}</span>
+              </span>
+              <span class="shrink-0 text-right">
+                <span class="block font-semibold tabular-nums" :class="item.level === 'rugi' ? 'text-red-600' : 'text-amber-600'">{{ rupiah(item.price, false) }}</span>
+                <span class="text-xs" :class="item.level === 'rugi' ? 'text-red-600' : 'text-amber-700'">{{ item.level === 'rugi' ? 'rugi' : 'margin rendah' }}</span>
+              </span>
+            </li>
+          </ul>
         </section>
 
         <section v-if="data.low_stock" class="card">

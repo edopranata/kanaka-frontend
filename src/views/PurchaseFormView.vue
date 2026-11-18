@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import http, { errorMessage, validationErrors } from '../api/http'
 import { useMetaStore } from '../stores/meta'
+import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { isoDate, number, rupiah, tanggal, tanggalAngka, today } from '../utils/format'
 import AppIcon from '../components/AppIcon.vue'
@@ -13,9 +14,12 @@ import PageHeader from '../components/PageHeader.vue'
 import ProductSearch from '../components/ProductSearch.vue'
 import AppSelect from '../components/AppSelect.vue'
 import DateInput from '../components/DateInput.vue'
+import PriceReview from '../components/PriceReview.vue'
+import { averageCost, marginOf, reviewPrices, suggestLossPrices } from '../utils/priceGuard'
 
 const router = useRouter()
 const toast = useToastStore()
+const canPrice = useAuthStore().can('products.price')
 
 const suppliers = ref([])
 const meta = useMetaStore()
@@ -51,6 +55,10 @@ function addProduct(product) {
     sku: product.sku,
     base_unit: product.unit,
     base_cost: baseCost,
+    exact_cost: Number(product.cost_price) || 0,
+    margin: marginOf(product, meta),
+    // Satuan jual + harganya, untuk pengecekan harga terhadap HPP baru.
+    sell_units: product.units || [],
     stock: product.stock,
     // Satuan beli: satuan dasar + satuan jual lain (mis. DUS isi 24).
     units: [{ id: null, name: product.unit, conversion: 1 }, ...(product.units || []).filter((unit) => unit.conversion > 1)],
@@ -88,11 +96,42 @@ function newCost(item) {
   return stock + incoming > 0 ? Math.round((stock * item.base_cost + incoming * unitCost) / (stock + incoming)) : item.base_cost
 }
 
+// ---- Pengaman harga jual: HPP baru vs harga jual (di bawah HPP ditolak, di bawah margin minimum wajib konfirmasi) ----
+const prices = reactive({})
+const confirmLow = ref(false)
+const ratio = computed(() => (subtotal.value > 0 ? total.value / subtotal.value : 1))
+const priceLines = computed(() =>
+  form.items
+    .filter((item) => item.cost > 0 && lineCount(item) > 0)
+    .map((item) => ({
+      product_id: item.product_id,
+      name: item.name,
+      base_unit: item.base_unit,
+      old_cost: item.exact_cost,
+      new_cost: averageCost(item.stock, item.exact_cost, lineCount(item), (item.cost / item.conversion) * ratio.value),
+      margin: item.margin,
+      units: item.sell_units,
+    })),
+)
+const review = computed(() => reviewPrices(priceLines.value, prices))
+// Harga beli per satuan dasar beda >30% dari HPP lama: biasanya salah isi satuan (mis. 1 DUS = 114, seharusnya 144).
+const drastic = computed(() =>
+  form.items
+    .filter((item) => item.exact_cost > 0 && item.cost > 0)
+    .map((item) => ({ item, incoming: item.cost / item.conversion, change: (item.cost / item.conversion - item.exact_cost) / item.exact_cost }))
+    .filter((row) => Math.abs(row.change) > 0.3),
+)
+const unitName = (item) => item.units.find((unit) => unit.id === item.unit_id)?.name || item.base_unit
+const priceBlocked = computed(() => review.value.loss > 0 || (review.value.low > 0 && !confirmLow.value))
+
 function save() {
   if (!form.items.length) {
     toast.error('Tambahkan minimal satu barang.')
     return
   }
+  for (const key of Object.keys(prices)) delete prices[key]
+  if (canPrice) Object.assign(prices, suggestLossPrices(priceLines.value))
+  confirmLow.value = false
   confirming.value = true
 }
 
@@ -115,13 +154,16 @@ async function submit() {
       payment_method: tempo.value && !payNow.value ? null : form.payment_method,
       cash_account_id: form.payment_method === 'tunai' ? null : form.cash_account_id,
       items: form.items.map(({ product_id, unit_id, qty, cost }) => ({ product_id, product_unit_id: unit_id, qty, cost })),
+      prices: canPrice ? review.value.payload : undefined,
+      confirm_low_margin: confirmLow.value,
     })
     confirming.value = false
     toast.success(tempo.value ? `Pembelian tempo ${data.data.number} disimpan. Stok bertambah; hutang ${rupiah(data.data.remaining)} jatuh tempo ${tanggalAngka(data.data.due_date)}.` : `Pembelian ${data.data.number} disimpan. Stok bertambah.`)
     router.replace({ name: 'purchase', params: { id: data.data.id } })
   } catch (e) {
-    confirming.value = false
     errors.value = validationErrors(e)
+    // Masalah harga jual ditampilkan di dialog agar bisa langsung diperbaiki.
+    if (!Object.keys(errors.value).some((key) => key.startsWith('prices') || key === 'confirm_low_margin')) confirming.value = false
     toast.error(errorMessage(e))
   } finally {
     saving.value = false
@@ -294,6 +336,16 @@ onMounted(async () => {
           <AppIcon name="alert" :size="16" class="inline" /> Qty belum diisi untuk: {{ badQty.map((item) => item.name).join(', ') }}.
         </div>
 
+        <div v-if="drastic.length" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <p class="font-semibold"><AppIcon name="alert" :size="16" class="inline" /> Harga beli jauh berbeda dari HPP — cek isi satuan</p>
+          <ul class="mt-1 space-y-0.5 text-xs">
+            <li v-for="row in drastic" :key="row.item.product_id">
+              <b>{{ row.item.name }}</b>: {{ rupiah(Math.round(row.incoming)) }}/{{ row.item.base_unit }} vs HPP {{ rupiah(Math.round(row.item.exact_cost)) }}
+              (<b>{{ row.change > 0 ? '+' : '' }}{{ Math.round(row.change * 100) }}%</b>)<template v-if="row.item.conversion > 1"> · 1 {{ unitName(row.item) }} = {{ number(row.item.conversion) }} {{ row.item.base_unit }}, benar?</template>
+            </li>
+          </ul>
+        </div>
+
         <dl class="grid grid-cols-3 gap-x-4 gap-y-1 sm:grid-cols-4">
           <div><dt class="text-xs text-slate-500">Tanggal</dt><dd class="font-medium">{{ tanggal(form.date) }}</dd></div>
           <div><dt class="text-xs text-slate-500">Supplier</dt><dd class="font-medium">{{ supplierName || 'Tanpa supplier' }}</dd></div>
@@ -323,6 +375,8 @@ onMounted(async () => {
           </table>
         </div>
 
+        <PriceReview v-model:confirmed="confirmLow" :review="review" :prices="prices" :errors="errors" :editable="canPrice" class="shrink-0" />
+
         <div class="grid gap-2 sm:grid-cols-2 sm:gap-3">
           <div class="space-y-1 rounded-xl bg-slate-50 p-3">
             <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span class="tabular-nums">{{ rupiah(subtotal) }}</span></div>
@@ -348,7 +402,7 @@ onMounted(async () => {
       <template #footer>
         <button v-if="zeroCost.length" class="btn-secondary" @click="fixCost">Perbaiki harga beli</button>
         <button v-else class="btn-secondary" @click="confirming = false">Kembali</button>
-        <button class="btn-primary" :class="{ 'bg-amber-600 hover:bg-amber-700': zeroCost.length }" :disabled="saving || badQty.length" @click="submit">
+        <button class="btn-primary" :class="{ 'bg-amber-600 hover:bg-amber-700': zeroCost.length }" :disabled="saving || badQty.length || priceBlocked" @click="submit">
           <AppIcon name="check" :size="16" /> {{ saving ? 'Menyimpan…' : zeroCost.length ? 'Tetap Simpan (harga 0)' : 'Ya, Simpan Pembelian' }}
         </button>
       </template>
